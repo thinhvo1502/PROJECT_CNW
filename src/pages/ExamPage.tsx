@@ -245,6 +245,33 @@ const ExamPage = () => {
                 </div>
                 <p className="tg-lg">{currentQuestion.content}</p>
               </div>
+              {/* đáp án */}
+              <div className="space-y-3 mb-8">
+                {currentQuestion.options.map((option, index) => (
+                  <div
+                    key={index}
+                    onClick={() => handleSelectAnswer(index)}
+                    className={`p-4 border rounded-lg cursor-pointer transition-colors ${
+                      userAnswers[currentQuestionIndex] === index
+                        ? "border-blue-500 bg--blue-50"
+                        : "border-gray-200 hover:bg-gray-50"
+                    }`}
+                  >
+                    <div className="flex item-center">
+                      <div
+                        className={`w-8 h-8 rounded-full flex items center justify-center mr-3 font-medium ${
+                          userAnswers[currentQuestionIndex] === index
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                      >
+                        {String.fromCharCode(65 + index)}
+                      </div>
+                      <span>{option}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         </div>
