@@ -27,7 +27,7 @@ export default function AppRouter() {
       <Route path="/profile" element={<ProfilePage />} />
 
       {/* Nếu URL không hợp lệ, chuyển về /login */}
-      <Route path="*" element={<Navigate to="/login" />} />
+      {/* <Route path="*" element={<Navigate to="/login" />} /> */}
     </Routes>
   );
 }

@@ -26,11 +26,6 @@ const ExamPage = () => {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   // state cho các câu trả lời người dùng
   const [userAnswers, setUserAnswers] = useState<number[]>([]);
-  // state cho thời gian còn lại
-  const [timeLeft, setTimeLeft] = useState<number>(0);
-  // state cho trạng thái xác nhận nộp bài
-  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
-  // dữ liệu mẫu cho bài thi
   // Dữ liệu mẫu cho bài thi
   const quizData: Exam = {
     id: 1,
@@ -122,6 +117,12 @@ const ExamPage = () => {
       },
     ],
   };
+  // state cho thời gian còn lại
+  const [timeLeft, setTimeLeft] = useState<number>(quizData.timeMinutes * 60);
+  // state cho trạng thái xác nhận nộp bài
+  const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
+  // dữ liệu mẫu cho bài thi
+
   // khởi tạo mảng câu trả lời người dùng
   useEffect(() => {
     setUserAnswers(new Array(quizData.questions.length).fill(null));
@@ -129,7 +130,7 @@ const ExamPage = () => {
   }, [quizData.questions.length, quizData.timeMinutes]);
   // đếm ngược thời gian
   useEffect(() => {
-    if (timeLeft <= 0) {
+    if (timeLeft <= 0 && timeLeft !== quizData.timeMinutes * 60) {
       handleSubmitQuiz();
       return;
     }
@@ -137,7 +138,7 @@ const ExamPage = () => {
       setTimeLeft((prev) => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, quizData.timeMinutes]);
   // xử lý chọn đáp án
   const handleSelectAnswer = (optionIndex: number) => {
     const newAnswers = [...userAnswers];
@@ -189,7 +190,9 @@ const ExamPage = () => {
             </div>
             <div className="mt-4 md:mt-0 flex items-center">
               <Clock className="h-5 w-5 text-red-500 mr-2" />
-              <span className="text-xl font-semibold text-red-500">16:00</span>
+              <span className="text-xl font-semibold text-red-500">
+                {formatTime(timeLeft)}
+              </span>
             </div>
           </div>
         </div>
@@ -224,6 +227,7 @@ const ExamPage = () => {
               </button>
             </div>
           </div>
+
           <div className="lg:col-span-3">
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="mb-6">
@@ -272,10 +276,82 @@ const ExamPage = () => {
                   </div>
                 ))}
               </div>
+              {/* nút chuyển câu hỏi */}
+              <div className="flex justify-between">
+                <button
+                  onClick={() => goToQuestion(currentQuestionIndex - 1)}
+                  disabled={currentQuestionIndex - 1 === 0}
+                  className={`flex items-center px-4 py-2 rounded-md ${
+                    currentQuestionIndex === 0
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed "
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                  }`}
+                >
+                  <ChevronLeft className="h-5 w-5 mr-1" />
+                  Câu trước
+                </button>
+
+                <button
+                  onClick={() => goToQuestion(currentQuestionIndex + 1)}
+                  disabled={
+                    currentQuestionIndex + 1 === quizData.questions.length
+                  }
+                  className={`flex items-center px-4 py-2 rounded-md ${
+                    currentQuestionIndex + 1 === quizData.questions.length
+                      ? "bg-gray-100 text-gray-400 cursor-not-allowed "
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                  }`}
+                >
+                  Câu tiếp theo
+                  <ChevronRight className="h-5 w-5 ml-1" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Xác nhận nộp bài */}
+      {showConfirmSubmit && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="flex items-center text-amber-500 mb-4">
+              <AlertCircle className="h-6 w-6 mr-2" />
+              <h3 className="text-lg font-semibold">Xác nhận nộp bài</h3>
+            </div>
+
+            <p className="mb-2">Bạn có chắc chắn muốn nộp bài?</p>
+
+            <div className="text-sm text-gray-600 mb-6">
+              <p>
+                - Số câu trả lời:{" "}
+                {userAnswers.filter((answer) => answer !== null).length} /{" "}
+                {quizData.questions.length}
+              </p>
+              <p>
+                - Số câu chưa trả lời:{" "}
+                {userAnswers.filter((answer) => answer === null).length} /{" "}
+                {quizData.questions.length}
+              </p>
+            </div>
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowConfirmSubmit(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleSubmitQuiz}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
+                Nộp bài
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
