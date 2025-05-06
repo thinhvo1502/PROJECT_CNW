@@ -478,13 +478,12 @@ const StatisticsPage = () => {
           <div className="mt-4 text-sm text-gray-500 text-center">
             <div className="flex items-center justify-center space-x-6">
               <div className="flex items-center">
-                <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span>
+                <span className="inline-block w-3 h-3 bg-green-500 rounded-full mr-1"></span>{" "}
                 Mục tiêu: 80 điểm
               </div>
               <div className="flex items-center">
-                <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-1">
-                  Ngưỡng đạt: 50 điểm
-                </span>
+                <span className="inline-block w-3 h-3 bg-red-500 rounded-full mr-1"></span>{" "}
+                Ngưỡng đạt: 50 điểm
               </div>
             </div>
           </div>

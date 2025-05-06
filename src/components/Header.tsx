@@ -43,11 +43,11 @@ const Header = () => {
     );
   }
   const menuItems = [
-    { name: "Trang chủ", path: "/" },
-    { name: "Làm bài", path: "/exam-list" },
+    { name: "Trang chủ", path: "/home" },
+    { name: "Làm bài", path: "/exam" },
     { name: "Lịch sử làm bài", path: "/history" },
-    { name: "Thống kê học tập", path: "/statistic" },
-    { name: "Gợi ý thông minh", path: "/suggestion" },
+    { name: "Thống kê học tập", path: "/statistics" },
+    { name: "Gợi ý thông minh", path: "/suggestions" },
   ];
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);

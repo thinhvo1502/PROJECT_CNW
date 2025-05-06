@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LoginPage from "../pages/LoginPage";
 import RegisterPage from "../pages/RegisterPage";
+import Logout from "../pages/Logout";
 import HomePage from "../pages/HomePage";
 import ExamListPage from "../pages/ExamListPage";
 import ExamPage from "../pages/ExamPage";
@@ -23,7 +24,8 @@ export default function AppRouter() {
       <Route path="/home" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
-      <Route path="/exam-list" element={<ExamListPage />} />
+      <Route path="/logout" element={<Logout />} />
+      <Route path="/exam" element={<ExamListPage />} />
       <Route path="/exam/:id" element={<ExamPage />} />
       <Route path="/result/:id" element={<ResultPage />} />
       <Route path="/result-detail/:id" element={<ResultDetailPage />} />

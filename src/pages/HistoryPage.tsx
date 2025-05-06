@@ -270,7 +270,7 @@ const HistoryPage = () => {
               </div>
             </div>
           </div>
-          <div className="bg-white rounded-lg shaodw-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center">
               <div className="rounded-full bg-red-100 p-3 mr-4">
                 <AlertTriangle className="h-6 w-6 text-red-600" />
