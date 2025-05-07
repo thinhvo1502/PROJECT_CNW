@@ -1,4 +1,7 @@
-import React, { useState } from "react";
+"use client";
+
+import { Link } from "react-router-dom";
+import { useState } from "react";
 import {
   BarChart,
   Bar,
@@ -7,8 +10,19 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
 } from "recharts";
-import { LineChart, Line } from "recharts";
+import {
+  Home,
+  FileText,
+  Users,
+  Settings,
+  DollarSign,
+  BarChart2,
+  Search,
+} from "lucide-react";
 
 const revenueData = [
   { name: "Tháng 1", "Thống Kê Doanh Thu": 4000 },
@@ -25,201 +39,323 @@ const attemptsData = [
 ];
 
 const AdminHome = () => {
-  const [showForm, setShowForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [exams, setExams] = useState([
     {
       id: 1,
       name: "Cơ sở dữ liệu",
+      topic: "Công nghệ thông tin",
       questions: 50,
       author: "4801104001",
       date: "01/01/2025",
+      price: 50000,
     },
     {
       id: 2,
       name: "Cấu Trúc Dữ Liệu",
+      topic: "Công nghệ thông tin",
       questions: 40,
       author: "4801104129",
       date: "15/02/2025",
+      price: 45000,
     },
   ]);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    questions: "",
-    author: "",
-  });
-
-  const handleAddExam = () => {
-    setShowForm(true);
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
   };
 
-  const handleCancel = () => {
-    setShowForm(false);
-    setFormData({ name: "", questions: "", author: "" });
-  };
+  const filteredExams = exams.filter(
+    (exam) =>
+      exam.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exam.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exam.topic.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  // Tính tổng số đề thi và tổng số câu hỏi
+  const totalExams = exams.length;
+  const totalQuestions = exams.reduce((sum, exam) => sum + exam.questions, 0);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const newExam = {
-      id: Math.floor(Math.random() * 10000), // Tạo ID ngẫu nhiên
-      name: formData.name,
-      questions: Number(formData.questions), // Chuyển đổi sang số
-      author: formData.author,
-      date: new Date().toLocaleDateString("vi-VN"), // Ngày hiện tại
-    };
-    setExams((prev) => [...prev, newExam]); // Cập nhật danh sách
-    handleCancel(); // Đóng form
-  };
+  // Tính tổng doanh thu
+  const totalRevenue = revenueData.reduce(
+    (sum, item) => sum + item["Thống Kê Doanh Thu"],
+    0
+  );
+
+  // Tính tổng lượt làm bài
+  const totalAttempts = attemptsData.reduce(
+    (sum, item) => sum + item["Thống Kê Lượt Làm Bài"],
+    0
+  );
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen relative">
-      {/* Tiêu đề */}
-      <h1 className="text-2xl font-bold mb-6">Quản lý Đề thi</h1>
-
-      {/* Bảng danh sách đề kiểm tra */}
-      <div className="bg-white shadow-md rounded mb-8">
-        <div className="flex justify-between items-center p-4">
-          <h2 className="text-lg font-semibold">Danh sách Đề thi</h2>
-          <button
-            onClick={handleAddExam}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-          >
-            Thêm Đề thi
-          </button>
-        </div>
-        <table className="w-full border-collapse">
-          <thead className="bg-gray-200">
-            <tr>
-              <th className="p-3 text-left">ID</th>
-              <th className="p-3 text-left">Tên Đề thi</th>
-              <th className="p-3 text-left">Số câu hỏi</th>
-              <th className="p-3 text-left">Tác giả</th>
-              <th className="p-3 text-left">Ngày tạo</th>
-              <th className="p-3 text-left">Hành động</th>
-            </tr>
-          </thead>
-          <tbody>
-            {exams.map((exam) => (
-              <tr key={exam.id} className="border-b">
-                <td className="p-3">{exam.id}</td>
-                <td className="p-3">{exam.name}</td>
-                <td className="p-3">{exam.questions}</td>
-                <td className="p-3">{exam.author}</td>
-                <td className="p-3">{exam.date}</td>
-                <td className="p-3">
-                  <button className="text-blue-500 hover:underline">Sửa</button>
-                  <button className="text-red-500 hover:underline ml-4">
-                    Xóa
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Biểu đồ */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Biểu đồ doanh thu */}
-        <div className="bg-white p-4 rounded shadow-md">
-          <h2 className="text-lg font-semibold mb-4">Thống kê Doanh thu</h2>
-          <BarChart width={500} height={300} data={revenueData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip formatter={(value) => `${value} VNĐ`} />
-            <Legend />
-            <Bar dataKey="Thống Kê Doanh Thu" fill="#8884d8" />
-          </BarChart>
-        </div>
-
-        {/* Biểu đồ lượt làm bài */}
-        <div className="bg-white p-4 rounded shadow-md">
-          <h2 className="text-lg font-semibold mb-4">Thống kê Lượt làm bài</h2>
-          <LineChart width={500} height={300} data={attemptsData}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip formatter={(value) => `${value} lượt`} />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="Thống Kê Lượt Làm Bài"
-              stroke="#82ca9d"
-            />
-          </LineChart>
+    <div className="flex h-screen bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-64 bg-gradient-to-b from-blue-700 to-blue-900 text-white shadow-lg">
+        <div className="p-6">
+          <h1 className="text-2xl font-bold mb-6">Danh mục quản lý</h1>
+          <nav>
+            <ul className="space-y-2">
+              <li>
+                <Link
+                  to="/"
+                  className="flex items-center p-3 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all"
+                >
+                  <Home className="mr-3 h-5 w-5" />
+                  <span>Home</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/admin/manage-exams"
+                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <FileText className="mr-3 h-5 w-5" />
+                  <span>Đề thi</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/admin/manage-users"
+                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <Users className="mr-3 h-5 w-5" />
+                  <span>Người dùng</span>
+                </Link>
+              </li>
+              <li>
+                <a
+                  href="#"
+                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <Settings className="mr-3 h-5 w-5" />
+                  <span>Cài đặt</span>
+                </a>
+              </li>
+            </ul>
+          </nav>
         </div>
       </div>
 
-      {/* Form thêm đề thi */}
-      {showForm && (
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 bg-opacity-90 flex justify-center items-center transition-opacity duration-300">
-          <div className="bg-white p-6 rounded shadow-md w-96 transform scale-95 transition-transform duration-300">
-            <h2 className="text-lg font-semibold mb-4">Thêm Đề thi</h2>
-            <form onSubmit={handleSubmit}>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Tên Đề thi
-                </label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Số lượng câu hỏi
-                </label>
-                <input
-                  type="number"
-                  name="questions"
-                  value={formData.questions}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Tác giả
-                </label>
-                <input
-                  type="text"
-                  name="author"
-                  value={formData.author}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded px-3 py-2"
-                  required
-                />
-              </div>
-              <div className="flex justify-end gap-4">
-                <button
-                  type="button"
-                  className="bg-gray-300 text-black px-4 py-2 rounded hover:bg-gray-400"
-                  onClick={handleCancel}
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-                >
-                  Thêm Đề thi
-                </button>
-              </div>
-            </form>
+      {/* Main Content */}
+      <div className="flex-1 overflow-auto">
+        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">Quản lý Đề thi</h1>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <input
+                type="text"
+                placeholder="Tìm kiếm..."
+                className="pl-10 pr-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                value={searchTerm}
+                onChange={handleSearch}
+              />
+            </div>
           </div>
-        </div>
-      )}
+        </header>
+
+        <main className="p-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
+              <div className="rounded-full bg-blue-100 p-3 mr-4">
+                <FileText className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Tổng số đề thi</p>
+                <p className="text-2xl font-bold text-gray-800">{totalExams}</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
+              <div className="rounded-full bg-blue-100 p-3 mr-4">
+                <BarChart2 className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Tổng số câu hỏi</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {totalQuestions}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
+              <div className="rounded-full bg-blue-100 p-3 mr-4">
+                <DollarSign className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Tổng doanh thu</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {totalRevenue.toLocaleString()} VNĐ
+                </p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
+              <div className="rounded-full bg-blue-100 p-3 mr-4">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Lượt làm bài</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {totalAttempts}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Bảng danh sách đề kiểm tra */}
+          <div className="bg-white shadow-sm rounded-xl mb-8 border border-gray-100">
+            <div className="flex justify-between items-center p-6 border-b">
+              <h2 className="text-lg font-semibold text-gray-800">
+                Danh sách Đề thi
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 text-gray-600 text-sm">
+                    <th className="px-6 py-4 text-left font-medium">ID</th>
+                    <th className="px-6 py-4 text-left font-medium">
+                      Tên Đề thi
+                    </th>
+                    <th className="px-6 py-4 text-left font-medium">
+                      Chủ đề liên quan
+                    </th>
+                    <th className="px-6 py-4 text-left font-medium">
+                      Số câu hỏi
+                    </th>
+                    <th className="px-6 py-4 text-left font-medium">Tác giả</th>
+                    <th className="px-6 py-4 text-left font-medium">
+                      Ngày tạo
+                    </th>
+                    <th className="px-6 py-4 text-left font-medium">
+                      Thành tiền
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredExams.length > 0 ? (
+                    filteredExams.map((exam) => (
+                      <tr
+                        key={exam.id}
+                        className="border-b border-gray-100 hover:bg-gray-50"
+                      >
+                        <td className="px-6 py-4 text-gray-800">{exam.id}</td>
+                        <td className="px-6 py-4 text-gray-800 font-medium">
+                          {exam.name}
+                        </td>
+                        <td className="px-6 py-4 text-gray-800">
+                          {exam.topic}
+                        </td>
+                        <td className="px-6 py-4 text-gray-800">
+                          {exam.questions}
+                        </td>
+                        <td className="px-6 py-4 text-gray-800">
+                          {exam.author}
+                        </td>
+                        <td className="px-6 py-4 text-gray-800">{exam.date}</td>
+                        <td className="px-6 py-4 text-gray-800">
+                          {exam.price.toLocaleString()} VNĐ
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan={7}
+                        className="px-6 py-8 text-center text-gray-500"
+                      >
+                        Không tìm thấy đề thi nào phù hợp với tìm kiếm
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Biểu đồ */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Biểu đồ doanh thu */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h2 className="text-lg font-semibold mb-6 text-gray-800">
+                Thống kê Doanh thu
+              </h2>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={revenueData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" tick={{ fill: "#6b7280" }} />
+                    <YAxis tick={{ fill: "#6b7280" }} />
+                    <Tooltip
+                      formatter={(value) => [
+                        `${value.toLocaleString()} VNĐ`,
+                        "Doanh Thu",
+                      ]}
+                      contentStyle={{
+                        backgroundColor: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                      }}
+                    />
+                    <Legend />
+                    <Bar
+                      dataKey="Thống Kê Doanh Thu"
+                      fill="#3b82f6"
+                      radius={[4, 4, 0, 0]}
+                      barSize={40}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Biểu đồ lượt làm bài */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+              <h2 className="text-lg font-semibold mb-6 text-gray-800">
+                Thống kê Lượt làm bài
+              </h2>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={attemptsData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="name" tick={{ fill: "#6b7280" }} />
+                    <YAxis tick={{ fill: "#6b7280" }} />
+                    <Tooltip
+                      formatter={(value) => [`${value} lượt`, "Lượt Làm Bài"]}
+                      contentStyle={{
+                        backgroundColor: "white",
+                        border: "1px solid #e5e7eb",
+                        borderRadius: "0.5rem",
+                        boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
+                      }}
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="Thống Kê Lượt Làm Bài"
+                      stroke="#3b82f6"
+                      strokeWidth={3}
+                      dot={{
+                        r: 6,
+                        fill: "#3b82f6",
+                        strokeWidth: 2,
+                        stroke: "white",
+                      }}
+                      activeDot={{
+                        r: 8,
+                        fill: "#3b82f6",
+                        strokeWidth: 2,
+                        stroke: "white",
+                      }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

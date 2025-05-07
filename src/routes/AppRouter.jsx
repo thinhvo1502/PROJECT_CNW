@@ -17,6 +17,7 @@ import ManageUsers from "../admin/ManageUsers";
 import RevenueStatistics from "../admin/RevenueStatistics";
 import ExamAttemptsStatistics from "../admin/ExamAttemptsStatistics";
 import AdminHome from "../admin/AdminHome";
+
 export default function AppRouter() {
   return (
     <Routes>
