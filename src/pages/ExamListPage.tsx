@@ -7,6 +7,7 @@ import {
   Clock,
   BookOpen,
   BarChart3,
+  Crown,
 } from "lucide-react";
 import React from "react";
 interface Quiz {
@@ -17,6 +18,9 @@ interface Quiz {
   questionCount: number;
   difficulty: "Dễ" | "Trung bình" | "Khó";
   difficultyColor: string;
+  isPremium: boolean;
+  price?: number;
+  isOwned?: boolean;
 }
 interface Topic {
   id: number;
@@ -30,6 +34,9 @@ function ExamListPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(
     null
   );
+  const [selectedPriceFilter, setSelectedPriceFilter] = useState<
+    "all" | "free" | "premium" | "owned"
+  >("all");
 
   // state cho danh sách đề thi đã lọc
   const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>([]);
@@ -48,6 +55,7 @@ function ExamListPage() {
   const difficulties = ["Dễ", "Trung bình", "Khó"];
 
   // Danh sách đề thi mẫu
+  // Danh sách đề thi mẫu
   const quizzes: Quiz[] = [
     {
       id: 1,
@@ -57,6 +65,7 @@ function ExamListPage() {
       questionCount: 20,
       difficulty: "Dễ",
       difficultyColor: "bg-green-100 text-green-800",
+      isPremium: false,
     },
     {
       id: 2,
@@ -66,6 +75,7 @@ function ExamListPage() {
       questionCount: 30,
       difficulty: "Trung bình",
       difficultyColor: "bg-yellow-100 text-yellow-800",
+      isPremium: false,
     },
     {
       id: 3,
@@ -75,6 +85,9 @@ function ExamListPage() {
       questionCount: 40,
       difficulty: "Khó",
       difficultyColor: "bg-red-100 text-red-800",
+      isPremium: true,
+      price: 50000,
+      isOwned: true,
     },
     {
       id: 4,
@@ -84,6 +97,8 @@ function ExamListPage() {
       questionCount: 25,
       difficulty: "Trung bình",
       difficultyColor: "bg-yellow-100 text-yellow-800",
+      isPremium: true,
+      price: 50000,
     },
     {
       id: 5,
@@ -93,6 +108,7 @@ function ExamListPage() {
       questionCount: 30,
       difficulty: "Trung bình",
       difficultyColor: "bg-yellow-100 text-yellow-800",
+      isPremium: false,
     },
     {
       id: 6,
@@ -102,6 +118,8 @@ function ExamListPage() {
       questionCount: 35,
       difficulty: "Khó",
       difficultyColor: "bg-red-100 text-red-800",
+      isPremium: true,
+      price: 50000,
     },
     {
       id: 7,
@@ -111,6 +129,7 @@ function ExamListPage() {
       questionCount: 20,
       difficulty: "Dễ",
       difficultyColor: "bg-green-100 text-green-800",
+      isPremium: false,
     },
     {
       id: 8,
@@ -120,6 +139,9 @@ function ExamListPage() {
       questionCount: 25,
       difficulty: "Trung bình",
       difficultyColor: "bg-yellow-100 text-yellow-800",
+      isPremium: true,
+      price: 50000,
+      isOwned: true,
     },
   ];
 
@@ -146,8 +168,18 @@ function ExamListPage() {
         (quiz) => quiz.difficulty === selectedDifficulty
       );
     }
+    // lọc theo giá
+    if (selectedPriceFilter !== "all") {
+      if (selectedPriceFilter === "free") {
+        results = results.filter((quiz) => !quiz.isPremium);
+      } else if (selectedPriceFilter === "premium") {
+        results = results.filter((quiz) => quiz.isPremium);
+      } else if (selectedPriceFilter === "owned") {
+        results = results.filter((quiz) => quiz.isOwned);
+      }
+    }
     setFilteredQuizzes(results);
-  }, [searchKeyword, selectedTopic, selectedDifficulty]);
+  }, [searchKeyword, selectedTopic, selectedDifficulty, selectedPriceFilter]);
 
   useEffect(() => {
     setFilteredQuizzes(quizzes);
@@ -157,6 +189,14 @@ function ExamListPage() {
     setSelectedTopic(null);
     setSelectedDifficulty(null);
     setSearchKeyword("");
+    setSelectedPriceFilter("all");
+  };
+  // Định dạng giá tiền
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(price);
   };
   return (
     <div className="container mx-auto px-4 py-8">
@@ -226,6 +266,30 @@ function ExamListPage() {
                 ))}
               </select>
             </div>
+            {/* Bộ lọc giá */}
+            <div>
+              <label
+                htmlFor="price"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Giá
+              </label>
+              <select
+                id="price"
+                value={selectedPriceFilter}
+                onChange={(e) =>
+                  setSelectedPriceFilter(
+                    e.target.value as "all" | "free" | "premium" | "owned"
+                  )
+                }
+                className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">Tất cả</option>
+                <option value="free">Miễn phí</option>
+                <option value="premium">Premium</option>
+                <option value="owned">Đã mua</option>
+              </select>
+            </div>
           </div>
           {/* nút reset và làm bài ngẫu nhiên */}
           <div className="flex flex-col sm:flex-row justify-between items-center mt-6">
@@ -236,13 +300,22 @@ function ExamListPage() {
               <Filter className="h-4 w-4 mr-1" />
               Xóa bộ lọc
             </button>
-            <Link
-              to="/exam/random"
-              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <Shuffle className="h-5 w-5 mr-2" />
-              Làm bài ngẫu nhiên
-            </Link>
+            <div className="flex space-x-4">
+              <Link
+                to="/pricing"
+                className="flex items-center justify-center px-4 py-2 border border-amber-500 text-amber-600 rounded-md hover:bg-amber-50 transition-colors"
+              >
+                <Crown className="h-5 w-5 mr-2" />
+                Nâng cấp Premium
+              </Link>
+              <Link
+                to="/exam/random"
+                className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <Shuffle className="h-5 w-5 mr-2" />
+                Làm bài ngẫu nhiên
+              </Link>
+            </div>
           </div>
         </div>
 

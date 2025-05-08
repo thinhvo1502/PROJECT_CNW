@@ -11,6 +11,7 @@ import HistoryPage from "../pages/HistoryPage";
 import StatisticsPage from "../pages/StatisticsPage";
 import SmartSuggestionsPage from "../pages/SmartSuggestionsPage";
 import ProfilePage from "../pages/ProfilePage";
+import Pricing from "../pages/Pricing";
 import ManageExams from "../admin/ManageExams";
 import ManageQuestions from "../admin/ManageQuestions";
 import ManageUsers from "../admin/ManageUsers";
@@ -34,6 +35,8 @@ export default function AppRouter() {
       <Route path="/statistics" element={<StatisticsPage />} />
       <Route path="/suggestions" element={<SmartSuggestionsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      {/* subscription routes */}
+      <Route path="/pricing" element={<Pricing />} />
       <Route path="/admin/manage-exams" element={<ManageExams />} />
       <Route path="/admin/manage-questions" element={<ManageQuestions />} />
       <Route path="/admin/manage-users" element={<ManageUsers />} />

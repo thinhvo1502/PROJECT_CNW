@@ -22,11 +22,19 @@ import {
   Lightbulb,
   Calendar,
   RefreshCw,
+  TrendingDown,
+  Sparkles,
+  Star,
+  Zap,
+  Users,
+  Crown,
+  Clock,
 } from "lucide-react";
 import { useState } from "react";
 import React from "react";
 function HomePage() {
   const isLoggedIn = true; // Replace with actual authentication check
+  const isPremium = false; // trạng thái người dùng có gói premium hay không
   const userName = "Nguyễn Văn A";
   // State để kiểm soát trạng thái dữ liệu
   const [hasQuizData, setHasQuizData] = useState(false); // Đặt thành false để xem trạng thái trống
@@ -65,36 +73,94 @@ function HomePage() {
       color: "bg-purple-100",
     },
   ];
-  // Dữ liệu mẫu cho lịch sử làm bài gần đây
-  const recentQuizHistory = [
+  // Dữ liệu mẫu cho đề thi được đề xuất
+  const recommendedQuizzes = [
     {
       id: 1,
-      quizName: "Kiến thức cơ bản về mạng LAN",
+      name: "Giao thức TCP/IP và mô hình OSI",
       topic: "Mạng máy tính",
-      score: 85,
-      totalQuestions: 10,
-      correctAnswers: 8.5,
-      dateTime: "2023-05-20T14:30:00",
+      difficulty: "Trung bình",
+      difficultyColor: "bg-yellow-100 text-yellow-800",
+      questionCount: 15,
+      timeMinutes: 30,
+      recommendReason: "Dựa trên điểm yếu của bạn về giao thức mạng",
+      recommendIcon: <TrendingDown className="h-4 w-4 text-red-500" />,
+      isPremium: false,
+      price: 0,
     },
     {
       id: 2,
-      quizName: "Giao thức TCP/IP và mô hình OSI",
-      topic: "Mạng máy tính",
-      score: 70,
-      totalQuestions: 15,
-      correctAnswers: 10.5,
-      dateTime: "2023-05-18T10:15:00",
+      name: "Cấu trúc dữ liệu cây và đồ thị",
+      topic: "Cấu trúc dữ liệu",
+      difficulty: "Khó",
+      difficultyColor: "bg-red-100 text-red-800",
+      questionCount: 20,
+      timeMinutes: 45,
+      recommendReason: "Phù hợp với sở thích của bạn về cấu trúc dữ liệu",
+      recommendIcon: <Star className="h-4 w-4 text-yellow-500" />,
+      isPremium: true,
+      price: 50000,
     },
     {
       id: 3,
-      quizName: "Cấu trúc dữ liệu cây và đồ thị",
-      topic: "Cấu trúc dữ liệu",
-      score: 92,
-      totalQuestions: 20,
-      correctAnswers: 18.4,
-      dateTime: "2023-05-15T16:45:00",
+      name: "Lập trình hướng đối tượng nâng cao",
+      topic: "Lập trình hướng đối tượng",
+      difficulty: "Trung bình",
+      difficultyColor: "bg-yellow-100 text-yellow-800",
+      questionCount: 25,
+      timeMinutes: 40,
+      recommendReason: "Giúp cải thiện kiến thức về tính kế thừa và đa hình",
+      recommendIcon: <Zap className="h-4 w-4 text-purple-500" />,
+      isPremium: true,
+      price: 35000,
+    },
+    {
+      id: 4,
+      name: "Bảo mật mạng và mã hóa",
+      topic: "An toàn thông tin",
+      difficulty: "Khó",
+      difficultyColor: "bg-red-100 text-red-800",
+      questionCount: 30,
+      timeMinutes: 60,
+      recommendReason: "Đề thi mới và phổ biến trong cộng đồng",
+      recommendIcon: <Sparkles className="h-4 w-4 text-blue-500" />,
+      isPremium: true,
+      price: 75000,
+    },
+    {
+      id: 5,
+      name: "Cơ sở dữ liệu quan hệ và SQL",
+      topic: "Cơ sở dữ liệu",
+      difficulty: "Dễ",
+      difficultyColor: "bg-green-100 text-green-800",
+      questionCount: 20,
+      timeMinutes: 30,
+      recommendReason: "Phù hợp với trình độ hiện tại của bạn",
+      recommendIcon: <Users className="h-4 w-4 text-green-500" />,
+      isPremium: false,
+      price: 0,
+    },
+    {
+      id: 6,
+      name: "Quản lý tiến trình trong hệ điều hành",
+      topic: "Hệ điều hành",
+      difficulty: "Trung bình",
+      difficultyColor: "bg-yellow-100 text-yellow-800",
+      questionCount: 15,
+      timeMinutes: 25,
+      recommendReason: "Bổ sung kiến thức mới cho bạn",
+      recommendIcon: <Lightbulb className="h-4 w-4 text-amber-500" />,
+      isPremium: false,
+      price: 0,
     },
   ];
+  // Định dạng giá tiền
+  const formatPrice = (price: number) => {
+    return new Intl.NumberFormat("vi-VN", {
+      style: "currency",
+      currency: "VND",
+    }).format(price);
+  };
   // Format ngày giờ
   const formatDateTime = (dateTimeString: string) => {
     const date = new Date(dateTimeString);
@@ -111,7 +177,7 @@ function HomePage() {
       {/* Banner section */}
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
         <div className="container mx-auto px-4 py-12 md:py-16">
-          <div className="flex flex-col md:flex-row items-center justify-between">
+          <div className="flex flex-col md:flex-row items-center justify-center">
             <div className="max-w-2xl mb-8 md:mb-0">
               <h1 className="text-3xl md:text-4xl font-bold mb-4">
                 Xin chào, {userName}!
@@ -127,6 +193,15 @@ function HomePage() {
                 >
                   Bắt đầu ôn tập
                 </Link>
+                {!isPremium && (
+                  <Link
+                    to="/pricing"
+                    className="px-6 py-3 bg-amber-500 text-white font-medium rounded-md text-center hover:bg-amber-600 transition-colors flex items-center justify-center"
+                  >
+                    <Crown className="h-5 w-5 mr-2" />
+                    Nâng cấp Premium
+                  </Link>
+                )}
                 <Link
                   to="/statistics"
                   className="px-6 py-3 border border-white text-white font-medium rounded-md text-center hover:bg-blue-700 transition-colors"
@@ -146,7 +221,36 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Progress Chart Section */}
+      {/* Premium Banner (hiển thị nếu người dùng chưa có gói premium) */}
+      {!isPremium && (
+        <section className="bg-gradient-to-r from-amber-500 to-amber-600 text-white py-6">
+          <div className="container mx-auto px-4">
+            <div className="flex flex-col md:flex-row items-center justify-between max-w-6xl mx-auto">
+              <div className="flex items-center mb-4 md:mb-0">
+                <Crown className="h-8 w-8 mr-3" />
+                <div>
+                  <h2 className="text-xl font-bold">Nâng cấp lên Premium</h2>
+                  <p>Truy cập không giới hạn tất cả đề thi chất lượng cao</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <Link
+                  to="/pricing"
+                  className="px-6 py-2 bg-white text-amber-600 font-medium rounded-md hover:bg-gray-100 transition-colors"
+                >
+                  Xem gói Premium
+                </Link>
+                <Link
+                  to="/pricing#trial"
+                  className="px-6 py-2 border border-white text-white font-medium rounded-md hover:bg-amber-700 transition-colors"
+                >
+                  Dùng thử miễn phí
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
       {/* Progress Chart Section */}
       <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
@@ -232,49 +336,53 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Recent Quiz History Section */}
+      {/* Recommended Quizzes Section */}
       <section className="py-12 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-6xl mx-auto">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
               <div>
                 <h2 className="text-2xl font-bold mb-2">
-                  Lịch sử làm bài gần đây
+                  Đề thi được đề xuất cho bạn
                 </h2>
                 <p className="text-gray-600">
-                  Ba bài kiểm tra gần nhất bạn đã hoàn thành
+                  Dựa trên lịch sử làm bài và sở thích của bạn
                 </p>
               </div>
-              <Link
-                to="/history"
-                className="text-blue-600 font-medium flex items-center mt-2 md:mt-0 hover:underline"
-              >
-                Xem tất cả <ChevronRight className="h-4 w-4 ml-1" />
-              </Link>
+              <div className="flex items-center mt-2 md:mt-0 space-x-4">
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
+                  <span className="text-sm text-gray-600">Miễn phí</span>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-3 h-3 bg-amber-500 rounded-full mr-1"></div>
+                  <span className="text-sm text-gray-600">Premium</span>
+                </div>
+                <Link
+                  to="/quiz"
+                  className="text-blue-600 font-medium flex items-center hover:underline"
+                >
+                  Xem tất cả đề thi
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </div>
             </div>
-
             {hasQuizData ? (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {recentQuizHistory.map((quiz) => (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {recommendedQuizzes.map((quiz) => (
                   <div
                     key={quiz.id}
-                    className="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                    className="bg-white border rounded-lg shadow-md hover:shadow-md transition-shadow"
                   >
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-4">
                         <h3 className="text-lg font-semibold line-clamp-2">
-                          {quiz.quizName}
+                          {quiz.name}
                         </h3>
                         <span
-                          className={`text-sm font-medium px-2 py-1 rounded-full ${
-                            quiz.score >= 80
-                              ? "bg-green-100 text-green-800"
-                              : quiz.score >= 60
-                              ? "bg-yellow-100 text-yellow-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
+                          className={`text-xs font-medium px-2 py-1 rounded-full ${quiz.difficultyColor}`}
                         >
-                          {quiz.score}
+                          {quiz.difficulty}
                         </span>
                       </div>
 
@@ -283,32 +391,55 @@ function HomePage() {
                           <BookOpen className="h-4 w-4 mr-2" />
                           <span>{quiz.topic}</span>
                         </div>
+
                         <div className="flex items-center text-sm text-gray-600">
                           <Award className="h-4 w-4 mr-2" />
-                          <span>
-                            {quiz.correctAnswers}/{quiz.totalQuestions} câu đúng
-                          </span>
+                          <span>{quiz.questionCount} câu hỏi</span>
                         </div>
                         <div className="flex items-center text-sm text-gray-600">
-                          <Calendar className="h-4 w-4 mr-2" />
-                          <span>{formatDateTime(quiz.dateTime)}</span>
+                          <Clock className="h-4 w-4 mr-2" />
+                          <span>{quiz.timeMinutes} phút</span>
                         </div>
+                        <div className="flex items-center text-sm text-blue-600 bg-blue-50 p-2 rounded-md">
+                          {quiz.recommendIcon}
+                          <span className="ml-2">{quiz.recommendReason}</span>
+                        </div>
+                        {quiz.isPremium && (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-sm font-medium text-amber-600">
+                              <Crown className="h-4 w-4 mr-1" />
+                              <span>Premium</span>
+                            </div>
+                            <span className="text-sm font-medium">
+                              {formatPrice(quiz.price)}
+                            </span>
+                          </div>
+                        )}
                       </div>
-
-                      <div className="flex space-x-2">
-                        <Link
-                          to={`/quiz/${quiz.id}/result`}
-                          className="flex-1 text-center py-2 text-sm bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100 transition-colors"
-                        >
-                          Xem kết quả
-                        </Link>
+                      {quiz.isPremium && !isPremium ? (
+                        <div className="grid grid-cols-2 gap-2">
+                          <Link
+                            to={`/checkout/quiz/${quiz.id}`}
+                            className="flex items-center justify-center py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600 transition-colors"
+                          >
+                            <span>Mua ngay</span>
+                          </Link>
+                          <Link
+                            to="/pricing"
+                            className="flex items-center justify-center py-2 border border-amber-500 text-amber-500 rounded-md hover:bg-amber-50 transition-colors"
+                          >
+                            <Crown className="h-4 w-4 mr-1" />
+                            <span>Premium</span>
+                          </Link>
+                        </div>
+                      ) : (
                         <Link
                           to={`/quiz/${quiz.id}`}
-                          className="flex items-center justify-center px-3 py-2 text-sm border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
+                          className="block w-full text-center py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                         >
-                          <RefreshCw className="h-4 w-4" />
+                          Bắt đầu
                         </Link>
-                      </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -316,22 +447,61 @@ function HomePage() {
             ) : (
               <div className="bg-gray-50 p-8 rounded-lg shadow-sm text-center">
                 <div className="w-20 h-20 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
-                  <History className="h-10 w-10 text-blue-600" />
+                  <Sparkles className="h-10 w-10 text-blue-600" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">
-                  Chưa có lịch sử làm bài
+                  Chưa có đề xuất cá nhân hóa
                 </h3>
                 <p className="text-gray-600 mb-6 max-w-md mx-auto">
-                  Bạn chưa hoàn thành bài kiểm tra nào. Hãy bắt đầu làm bài để
-                  xem lịch sử làm bài của mình.
+                  Hệ thống cần dữ liệu từ các bài kiểm tra bạn đã làm để đưa ra
+                  đề xuất phù hợp. Dưới đây là một số đề thi phổ biến để bạn bắt
+                  đầu.
                 </p>
-                <Link
-                  to="/quiz"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  <PlusCircle className="h-5 w-5 mr-2" />
-                  Bắt đầu làm bài
-                </Link>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="font-medium mb-2">Mạng máy tính cơ bản</h4>
+                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <Award className="h-4 w-4 mr-1" />
+                      <span>15 câu hỏi</span>
+                    </div>
+                    <Link
+                      to="/quiz/1"
+                      className="block w-full text-center py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      Bắt đầu
+                    </Link>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="font-medium mb-2">Cấu trúc dữ liệu</h4>
+                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <Award className="h-4 w-4 mr-1" />
+                      <span>20 câu hỏi</span>
+                    </div>
+                    <div className="flex items-center text-sm font-medium text-amber-600 mb-2">
+                      <Crown className="h-4 w-4 mr-1" />
+                      <span>Premium</span>
+                    </div>
+                    <Link
+                      to="/pricing"
+                      className="block w-full text-center py-1.5 bg-amber-500 text-white text-sm rounded-md hover:bg-amber-600 transition-colors"
+                    >
+                      Nâng cấp
+                    </Link>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <h4 className="font-medium mb-2">Lập trình OOP</h4>
+                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <Award className="h-4 w-4 mr-1" />
+                      <span>25 câu hỏi</span>
+                    </div>
+                    <Link
+                      to="/quiz/3"
+                      className="block w-full text-center py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                      Bắt đầu
+                    </Link>
+                  </div>
+                </div>
               </div>
             )}
           </div>
