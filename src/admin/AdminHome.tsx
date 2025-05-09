@@ -22,6 +22,7 @@ import {
   DollarSign,
   BarChart2,
   Search,
+  Calendar,
 } from "lucide-react";
 
 const revenueData = [
@@ -31,7 +32,24 @@ const revenueData = [
   { name: "Tháng 4", "Thống Kê Doanh Thu": 7000 },
 ];
 
-const attemptsData = [
+const dailyAttemptsData = [
+  { name: "Thứ 2", "Thống Kê Lượt Làm Bài": 20 },
+  { name: "Thứ 3", "Thống Kê Lượt Làm Bài": 25 },
+  { name: "Thứ 4", "Thống Kê Lượt Làm Bài": 30 },
+  { name: "Thứ 5", "Thống Kê Lượt Làm Bài": 35 },
+  { name: "Thứ 6", "Thống Kê Lượt Làm Bài": 40 },
+  { name: "Thứ 7", "Thống Kê Lượt Làm Bài": 15 },
+  { name: "CN", "Thống Kê Lượt Làm Bài": 10 },
+];
+
+const weeklyAttemptsData = [
+  { name: "Tuần 1", "Thống Kê Lượt Làm Bài": 75 },
+  { name: "Tuần 2", "Thống Kê Lượt Làm Bài": 90 },
+  { name: "Tuần 3", "Thống Kê Lượt Làm Bài": 110 },
+  { name: "Tuần 4", "Thống Kê Lượt Làm Bài": 125 },
+];
+
+const monthlyAttemptsData = [
   { name: "Tháng 1", "Thống Kê Lượt Làm Bài": 120 },
   { name: "Tháng 2", "Thống Kê Lượt Làm Bài": 150 },
   { name: "Tháng 3", "Thống Kê Lượt Làm Bài": 200 },
@@ -40,13 +58,14 @@ const attemptsData = [
 
 const AdminHome = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [timeFilter, setTimeFilter] = useState("month"); // "day", "week", "month"
   const [exams, setExams] = useState([
     {
       id: 1,
       name: "Cơ sở dữ liệu",
       topic: "Công nghệ thông tin",
       questions: 50,
-      author: "4801104001",
+      difficulty: "Trung bình",
       date: "01/01/2025",
       price: 50000,
     },
@@ -55,7 +74,7 @@ const AdminHome = () => {
       name: "Cấu Trúc Dữ Liệu",
       topic: "Công nghệ thông tin",
       questions: 40,
-      author: "4801104129",
+      difficulty: "Khó",
       date: "15/02/2025",
       price: 45000,
     },
@@ -68,7 +87,7 @@ const AdminHome = () => {
   const filteredExams = exams.filter(
     (exam) =>
       exam.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exam.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exam.difficulty.toLowerCase().includes(searchTerm.toLowerCase()) ||
       exam.topic.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -82,11 +101,29 @@ const AdminHome = () => {
     0
   );
 
-  // Tính tổng lượt làm bài
-  const totalAttempts = attemptsData.reduce(
+  // Chọn dữ liệu thống kê lượt làm bài dựa trên bộ lọc thời gian
+  const getAttemptsData = () => {
+    switch (timeFilter) {
+      case "day":
+        return dailyAttemptsData;
+      case "week":
+        return weeklyAttemptsData;
+      case "month":
+      default:
+        return monthlyAttemptsData;
+    }
+  };
+
+  // Tính tổng lượt làm bài dựa trên bộ lọc thời gian
+  const totalAttempts = getAttemptsData().reduce(
     (sum, item) => sum + item["Thống Kê Lượt Làm Bài"],
     0
   );
+
+  // Số lượng người dùng
+  const totalUsers = 250;
+  const studentCount = 220;
+  const teacherCount = 30;
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -124,6 +161,15 @@ const AdminHome = () => {
                 </Link>
               </li>
               <li>
+                <Link
+                  to="/admin/manage-questions"
+                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <BarChart2 className="mr-3 h-5 w-5" />
+                  <span>Câu hỏi</span>
+                </Link>
+              </li>
+              <li>
                 <a
                   href="#"
                   className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
@@ -157,7 +203,7 @@ const AdminHome = () => {
 
         <main className="p-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
             <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
               <div className="rounded-full bg-blue-100 p-3 mr-4">
                 <FileText className="h-6 w-6 text-blue-600" />
@@ -200,6 +246,19 @@ const AdminHome = () => {
                 </p>
               </div>
             </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
+              <div className="rounded-full bg-blue-100 p-3 mr-4">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Người dùng</p>
+                <p className="text-2xl font-bold text-gray-800">{totalUsers}</p>
+                <div className="flex text-xs text-gray-500 mt-1">
+                  <span className="mr-2">SV: {studentCount}</span>
+                  <span>GV: {teacherCount}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Bảng danh sách đề kiểm tra */}
@@ -223,7 +282,7 @@ const AdminHome = () => {
                     <th className="px-6 py-4 text-left font-medium">
                       Số câu hỏi
                     </th>
-                    <th className="px-6 py-4 text-left font-medium">Tác giả</th>
+                    <th className="px-6 py-4 text-left font-medium">Mức độ</th>
                     <th className="px-6 py-4 text-left font-medium">
                       Ngày tạo
                     </th>
@@ -250,7 +309,7 @@ const AdminHome = () => {
                           {exam.questions}
                         </td>
                         <td className="px-6 py-4 text-gray-800">
-                          {exam.author}
+                          {exam.difficulty}
                         </td>
                         <td className="px-6 py-4 text-gray-800">{exam.date}</td>
                         <td className="px-6 py-4 text-gray-800">
@@ -312,12 +371,46 @@ const AdminHome = () => {
 
             {/* Biểu đồ lượt làm bài */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-              <h2 className="text-lg font-semibold mb-6 text-gray-800">
-                Thống kê Lượt làm bài
-              </h2>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  Thống kê Lượt làm bài
+                </h2>
+                <div className="flex items-center space-x-2 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setTimeFilter("day")}
+                    className={`px-3 py-1 rounded-md text-sm font-medium ${
+                      timeFilter === "day"
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    Ngày
+                  </button>
+                  <button
+                    onClick={() => setTimeFilter("week")}
+                    className={`px-3 py-1 rounded-md text-sm font-medium ${
+                      timeFilter === "week"
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    Tuần
+                  </button>
+                  <button
+                    onClick={() => setTimeFilter("month")}
+                    className={`px-3 py-1 rounded-md text-sm font-medium ${
+                      timeFilter === "month"
+                        ? "bg-white text-blue-600 shadow-sm"
+                        : "text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    Tháng
+                  </button>
+                </div>
+              </div>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={attemptsData}>
+                  <LineChart data={getAttemptsData()}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="name" tick={{ fill: "#6b7280" }} />
                     <YAxis tick={{ fill: "#6b7280" }} />

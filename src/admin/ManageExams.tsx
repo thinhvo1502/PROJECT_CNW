@@ -26,6 +26,7 @@ import {
   X,
   Edit,
   Trash2,
+  BarChart2,
 } from "lucide-react";
 
 const attemptsData = [
@@ -37,6 +38,23 @@ const attemptsData = [
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 
+// Danh sách chủ đề CNTT
+const itTopics = [
+  "Kỹ thuật phần mềm",
+  "Kỹ thuật lập trình",
+  "Trí tuệ nhân tạo",
+  "Cơ sở dữ liệu",
+  "Mạng máy tính",
+  "An toàn thông tin",
+  "Hệ điều hành",
+  "Kiến trúc máy tính",
+  "Công nghệ Web",
+  "Điện toán đám mây",
+];
+
+// Danh sách mức độ
+const difficultyLevels = ["Dễ", "Trung bình", "Khó", "Rất khó"];
+
 const ManageExams = () => {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -44,9 +62,9 @@ const ManageExams = () => {
     {
       id: 1,
       name: "Cơ sở dữ liệu",
-      topic: "Công nghệ thông tin",
+      topic: "Cơ sở dữ liệu",
       questions: 50,
-      author: "4801104001",
+      difficulty: "Trung bình",
       date: "01/01/2025",
       price: 50000,
       avgScore: 7.5,
@@ -54,9 +72,9 @@ const ManageExams = () => {
     {
       id: 2,
       name: "Cấu Trúc Dữ Liệu",
-      topic: "Công nghệ thông tin",
+      topic: "Kỹ thuật lập trình",
       questions: 40,
-      author: "4801104129",
+      difficulty: "Khó",
       date: "15/02/2025",
       price: 45000,
       avgScore: 6.8,
@@ -64,9 +82,9 @@ const ManageExams = () => {
     {
       id: 3,
       name: "Lập trình hướng đối tượng",
-      topic: "Lập trình",
+      topic: "Kỹ thuật lập trình",
       questions: 45,
-      author: "4801104002",
+      difficulty: "Dễ",
       date: "20/02/2025",
       price: 0,
       avgScore: 8.2,
@@ -74,9 +92,9 @@ const ManageExams = () => {
     {
       id: 4,
       name: "Mạng máy tính",
-      topic: "Mạng",
+      topic: "Mạng máy tính",
       questions: 60,
-      author: "4801104003",
+      difficulty: "Khó",
       date: "05/03/2025",
       price: 60000,
       avgScore: 7.0,
@@ -85,9 +103,9 @@ const ManageExams = () => {
 
   const [formData, setFormData] = useState({
     name: "",
-    topic: "",
+    topic: itTopics[0],
     questions: "",
-    author: "",
+    difficulty: difficultyLevels[0],
     price: "0",
     isPaid: false,
     examContent: "",
@@ -102,9 +120,9 @@ const ManageExams = () => {
     setShowForm(false);
     setFormData({
       name: "",
-      topic: "",
+      topic: itTopics[0],
       questions: "",
-      author: "",
+      difficulty: difficultyLevels[0],
       price: "0",
       isPaid: false,
       examContent: "",
@@ -139,7 +157,7 @@ const ManageExams = () => {
       name: formData.name,
       topic: formData.topic,
       questions: Number(formData.questions),
-      author: formData.author,
+      difficulty: formData.difficulty,
       date: new Date().toLocaleDateString("vi-VN"),
       price: formData.isPaid ? Number(formData.price) : 0,
       avgScore: 0,
@@ -163,7 +181,7 @@ const ManageExams = () => {
         name: examToEdit.name,
         topic: examToEdit.topic,
         questions: examToEdit.questions.toString(),
-        author: examToEdit.author,
+        difficulty: examToEdit.difficulty,
         price: examToEdit.price.toString(),
         isPaid: examToEdit.price > 0,
         examContent: "",
@@ -176,7 +194,7 @@ const ManageExams = () => {
   const filteredExams = exams.filter(
     (exam) =>
       exam.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      exam.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exam.difficulty.toLowerCase().includes(searchTerm.toLowerCase()) ||
       exam.topic.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -227,6 +245,15 @@ const ManageExams = () => {
                 >
                   <Users className="mr-3 h-5 w-5" />
                   <span>Người dùng</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/admin/manage-questions"
+                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <BarChart2 className="mr-3 h-5 w-5" />
+                  <span>Câu hỏi</span>
                 </Link>
               </li>
               <li>
@@ -290,7 +317,7 @@ const ManageExams = () => {
                     <th className="px-6 py-4 text-left font-medium">
                       Số câu hỏi
                     </th>
-                    <th className="px-6 py-4 text-left font-medium">Tác giả</th>
+                    <th className="px-6 py-4 text-left font-medium">Mức độ</th>
                     <th className="px-6 py-4 text-left font-medium">
                       Ngày tạo
                     </th>
@@ -323,7 +350,7 @@ const ManageExams = () => {
                           {exam.questions}
                         </td>
                         <td className="px-6 py-4 text-gray-800">
-                          {exam.author}
+                          {exam.difficulty}
                         </td>
                         <td className="px-6 py-4 text-gray-800">{exam.date}</td>
                         <td className="px-6 py-4 text-gray-800">
@@ -491,15 +518,19 @@ const ManageExams = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Chủ đề
                   </label>
-                  <input
-                    type="text"
+                  <select
                     name="topic"
                     value={formData.topic}
                     onChange={handleInputChange}
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Nhập chủ đề"
                     required
-                  />
+                  >
+                    {itTopics.map((topic) => (
+                      <option key={topic} value={topic}>
+                        {topic}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -517,17 +548,21 @@ const ManageExams = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tác giả
+                    Mức độ
                   </label>
-                  <input
-                    type="text"
-                    name="author"
-                    value={formData.author}
+                  <select
+                    name="difficulty"
+                    value={formData.difficulty}
                     onChange={handleInputChange}
                     className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Nhập mã số tác giả"
                     required
-                  />
+                  >
+                    {difficultyLevels.map((level) => (
+                      <option key={level} value={level}>
+                        {level}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="md:col-span-2">
                   <div className="flex items-center mb-2">

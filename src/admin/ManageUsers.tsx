@@ -21,12 +21,12 @@ import {
   Settings,
   UserPlus,
   Search,
-  Filter,
   Mail,
-  Phone,
-  Award,
-  BookOpen,
-  ChevronDown,
+  Edit,
+  Trash2,
+  Key,
+  BarChart2,
+  X,
 } from "lucide-react";
 
 const userActivityData = [
@@ -41,33 +41,22 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
 const ManageUsers = () => {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [userRole, setUserRole] = useState("Học sinh"); // Mặc định hiển thị học sinh
-  const [showRoleFilter, setShowRoleFilter] = useState(false);
+  const [showResetPasswordModal, setShowResetPasswordModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [users, setUsers] = useState([
     {
       id: 1,
       name: "Nguyễn Văn A",
       email: "nguyenvana@gmail.com",
-      phone: "0901234567",
       joinDate: "01/01/2025",
       role: "Học sinh",
       examsCompleted: 15,
       avgScore: 7.8,
     },
     {
-      id: 2,
-      name: "Trần Thị B",
-      email: "tranthib@gmail.com",
-      phone: "0912345678",
-      joinDate: "15/01/2025",
-      role: "Giáo viên",
-      examsCreated: 5,
-    },
-    {
       id: 3,
       name: "Lê Văn C",
       email: "levanc@gmail.com",
-      phone: "0923456789",
       joinDate: "20/01/2025",
       role: "Học sinh",
       examsCompleted: 10,
@@ -77,27 +66,16 @@ const ManageUsers = () => {
       id: 4,
       name: "Phạm Thị D",
       email: "phamthid@gmail.com",
-      phone: "0934567890",
       joinDate: "05/02/2025",
       role: "Học sinh",
       examsCompleted: 8,
       avgScore: 8.0,
-    },
-    {
-      id: 5,
-      name: "Hoàng Văn E",
-      email: "hoangvane@gmail.com",
-      phone: "0945678901",
-      joinDate: "10/02/2025",
-      role: "Giáo viên",
-      examsCreated: 8,
     },
   ]);
 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    phone: "",
     role: "Học sinh",
   });
 
@@ -110,7 +88,6 @@ const ManageUsers = () => {
     setFormData({
       name: "",
       email: "",
-      phone: "",
       role: "Học sinh",
     });
   };
@@ -126,12 +103,10 @@ const ManageUsers = () => {
       id: Math.floor(Math.random() * 10000),
       name: formData.name,
       email: formData.email,
-      phone: formData.phone,
       joinDate: new Date().toLocaleDateString("vi-VN"),
-      role: formData.role,
-      examsCompleted: formData.role === "Học sinh" ? 0 : undefined,
-      examsCreated: formData.role === "Giáo viên" ? 0 : undefined,
-      avgScore: formData.role === "Học sinh" ? 0 : undefined,
+      role: "Học sinh",
+      examsCompleted: 0,
+      avgScore: 0,
     };
     setUsers((prev) => [...prev, newUser]);
     handleCancel();
@@ -141,48 +116,49 @@ const ManageUsers = () => {
     setSearchTerm(e.target.value);
   };
 
-  const handleRoleFilter = (role) => {
-    setUserRole(role);
-    setShowRoleFilter(false);
+  const handleDeleteUser = (id) => {
+    setUsers((prev) => prev.filter((user) => user.id !== id));
   };
 
-  // Lọc người dùng theo vai trò và tìm kiếm
+  const handleEditUser = (id) => {
+    const userToEdit = users.find((user) => user.id === id);
+    if (userToEdit) {
+      setFormData({
+        name: userToEdit.name,
+        email: userToEdit.email,
+        role: userToEdit.role,
+      });
+      setShowForm(true);
+    }
+  };
+
+  const handleResetPassword = (id) => {
+    setSelectedUserId(id);
+    setShowResetPasswordModal(true);
+  };
+
+  const confirmResetPassword = () => {
+    // Xử lý reset mật khẩu ở đây
+    setShowResetPasswordModal(false);
+    setSelectedUserId(null);
+    alert(`Đã reset mật khẩu cho người dùng ID: ${selectedUserId}`);
+  };
+
+  // Lọc người dùng theo tìm kiếm
   const filteredUsers = users.filter(
     (user) =>
-      user.role === userRole &&
-      (user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase()))
+      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
-  // Dữ liệu cho biểu đồ tròn
-  const usersByRole = users.reduce((acc, user) => {
-    if (!acc[user.role]) {
-      acc[user.role] = 0;
-    }
-    acc[user.role]++;
-    return acc;
-  }, {});
-
-  const pieData = Object.keys(usersByRole).map((role) => ({
-    name: role,
-    value: usersByRole[role],
-  }));
 
   // Tính tổng số người dùng
   const totalUsers = users.length;
 
-  // Tính số lượng học sinh và giáo viên
-  const studentCount = users.filter((user) => user.role === "Học sinh").length;
-  const teacherCount = users.filter((user) => user.role === "Giáo viên").length;
-
-  // Tính tổng số đề thi đã làm (học sinh) hoặc đã tạo (giáo viên)
-  const totalExamsCompleted = users
-    .filter((user) => user.role === "Học sinh")
-    .reduce((sum, user) => sum + (user.examsCompleted || 0), 0);
-
-  const totalExamsCreated = users
-    .filter((user) => user.role === "Giáo viên")
-    .reduce((sum, user) => sum + (user.examsCreated || 0), 0);
+  // Tính tổng số đề thi đã làm
+  const totalExamsCompleted = users.reduce(
+    (sum, user) => sum + (user.examsCompleted || 0),
+    0
+  );
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -217,6 +193,15 @@ const ManageUsers = () => {
                 >
                   <Users className="mr-3 h-5 w-5" />
                   <span>Người dùng</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/admin/manage-questions"
+                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                >
+                  <BarChart2 className="mr-3 h-5 w-5" />
+                  <span>Câu hỏi</span>
                 </Link>
               </li>
               <li>
@@ -262,36 +247,14 @@ const ManageUsers = () => {
 
         <main className="p-6">
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
               <div className="rounded-full bg-blue-100 p-3 mr-4">
                 <Users className="h-6 w-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">Tổng số người dùng</p>
+                <p className="text-sm text-gray-500">Tổng số học sinh</p>
                 <p className="text-2xl font-bold text-gray-800">{totalUsers}</p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
-              <div className="rounded-full bg-blue-100 p-3 mr-4">
-                <BookOpen className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Số học sinh</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  {studentCount}
-                </p>
-              </div>
-            </div>
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
-              <div className="rounded-full bg-blue-100 p-3 mr-4">
-                <Award className="h-6 w-6 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Số giáo viên</p>
-                <p className="text-2xl font-bold text-gray-800">
-                  {teacherCount}
-                </p>
               </div>
             </div>
             <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
@@ -299,15 +262,27 @@ const ManageUsers = () => {
                 <FileText className="h-6 w-6 text-blue-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-500">
-                  {userRole === "Học sinh"
-                    ? "Tổng lượt làm bài"
-                    : "Tổng đề thi đã tạo"}
-                </p>
+                <p className="text-sm text-gray-500">Tổng lượt làm bài</p>
                 <p className="text-2xl font-bold text-gray-800">
-                  {userRole === "Học sinh"
-                    ? totalExamsCompleted
-                    : totalExamsCreated}
+                  {totalExamsCompleted}
+                </p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 flex items-center">
+              <div className="rounded-full bg-blue-100 p-3 mr-4">
+                <BarChart className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Điểm trung bình</p>
+                <p className="text-2xl font-bold text-gray-800">
+                  {users.length > 0
+                    ? (
+                        users.reduce(
+                          (sum, user) => sum + (user.avgScore || 0),
+                          0
+                        ) / users.length
+                      ).toFixed(1)
+                    : "0.0"}
                 </p>
               </div>
             </div>
@@ -317,36 +292,8 @@ const ManageUsers = () => {
           <div className="bg-white shadow-sm rounded-xl mb-8 border border-gray-100">
             <div className="p-6 border-b flex justify-between items-center">
               <h2 className="text-lg font-semibold text-gray-800">
-                Danh sách {userRole}
+                Danh sách Học sinh - Sinh viên
               </h2>
-              <div className="relative">
-                <button
-                  onClick={() => setShowRoleFilter(!showRoleFilter)}
-                  className="flex items-center text-gray-600 hover:text-gray-900 bg-gray-100 px-4 py-2 rounded-lg"
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  {userRole}
-                  <ChevronDown className="h-4 w-4 ml-2" />
-                </button>
-                {showRoleFilter && (
-                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                    <div className="py-1">
-                      <button
-                        onClick={() => handleRoleFilter("Học sinh")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Học sinh
-                      </button>
-                      <button
-                        onClick={() => handleRoleFilter("Giáo viên")}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                      >
-                        Giáo viên
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
@@ -356,21 +303,17 @@ const ManageUsers = () => {
                     <th className="px-6 py-4 text-left font-medium">Họ tên</th>
                     <th className="px-6 py-4 text-left font-medium">Email</th>
                     <th className="px-6 py-4 text-left font-medium">
-                      Số điện thoại
-                    </th>
-                    <th className="px-6 py-4 text-left font-medium">
                       Ngày tham gia
                     </th>
                     <th className="px-6 py-4 text-left font-medium">
-                      {userRole === "Học sinh"
-                        ? "Số đề thi đã làm"
-                        : "Số đề thi đã tạo"}
+                      Số đề thi đã làm
                     </th>
-                    {userRole === "Học sinh" && (
-                      <th className="px-6 py-4 text-left font-medium">
-                        Điểm trung bình
-                      </th>
-                    )}
+                    <th className="px-6 py-4 text-left font-medium">
+                      Điểm trung bình
+                    </th>
+                    <th className="px-6 py-4 text-left font-medium">
+                      Hành động
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -388,29 +331,47 @@ const ManageUsers = () => {
                           {user.email}
                         </td>
                         <td className="px-6 py-4 text-gray-800">
-                          {user.phone}
-                        </td>
-                        <td className="px-6 py-4 text-gray-800">
                           {user.joinDate}
                         </td>
                         <td className="px-6 py-4 text-gray-800">
-                          {userRole === "Học sinh"
-                            ? user.examsCompleted
-                            : user.examsCreated}
+                          {user.examsCompleted}
                         </td>
-                        {userRole === "Học sinh" && (
-                          <td className="px-6 py-4 text-gray-800">
-                            {user.avgScore > 0
-                              ? user.avgScore.toFixed(1)
-                              : "Chưa có dữ liệu"}
-                          </td>
-                        )}
+                        <td className="px-6 py-4 text-gray-800">
+                          {user.avgScore > 0
+                            ? user.avgScore.toFixed(1)
+                            : "Chưa có dữ liệu"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex space-x-3">
+                            <button
+                              onClick={() => handleEditUser(user.id)}
+                              className="text-blue-600 hover:text-blue-800 flex items-center"
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Sửa
+                            </button>
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="text-red-600 hover:text-red-800 flex items-center"
+                            >
+                              <Trash2 className="h-4 w-4 mr-1" />
+                              Xóa
+                            </button>
+                            <button
+                              onClick={() => handleResetPassword(user.id)}
+                              className="text-amber-600 hover:text-amber-800 flex items-center"
+                            >
+                              <Key className="h-4 w-4 mr-1" />
+                              Reset MK
+                            </button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td
-                        colSpan={userRole === "Học sinh" ? 7 : 6}
+                        colSpan={7}
                         className="px-6 py-8 text-center text-gray-500"
                       >
                         Không tìm thấy người dùng nào phù hợp với tìm kiếm
@@ -461,16 +422,21 @@ const ManageUsers = () => {
               </div>
             </div>
 
-            {/* Biểu đồ phân bố người dùng theo vai trò */}
+            {/* Biểu đồ phân bố điểm trung bình */}
             <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
               <h2 className="text-lg font-semibold mb-6 text-gray-800">
-                Phân bố người dùng theo vai trò
+                Phân bố điểm trung bình
               </h2>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
-                      data={pieData}
+                      data={[
+                        { name: "Dưới 5.0", value: 2 },
+                        { name: "5.0 - 6.9", value: 5 },
+                        { name: "7.0 - 8.9", value: 8 },
+                        { name: "9.0 - 10", value: 3 },
+                      ]}
                       cx="50%"
                       cy="50%"
                       labelLine={true}
@@ -481,7 +447,7 @@ const ManageUsers = () => {
                         `${name}: ${(percent * 100).toFixed(0)}%`
                       }
                     >
-                      {pieData.map((entry, index) => (
+                      {[0, 1, 2, 3].map((index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={COLORS[index % COLORS.length]}
@@ -489,7 +455,7 @@ const ManageUsers = () => {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(value, name) => [`${value} người dùng`, name]}
+                      formatter={(value, name) => [`${value} học sinh`, name]}
                     />
                     <Legend />
                   </PieChart>
@@ -506,26 +472,13 @@ const ManageUsers = () => {
           <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md transform scale-100 transition-transform duration-300 animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-bold text-gray-800">
-                Thêm Người dùng mới
+                {formData.id ? "Chỉnh sửa người dùng" : "Thêm người dùng mới"}
               </h2>
               <button
                 onClick={handleCancel}
                 className="text-gray-400 hover:text-gray-600"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-6 w-6" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -560,38 +513,6 @@ const ManageUsers = () => {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Số điện thoại
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formData.phone}
-                    onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                    placeholder="Nhập số điện thoại"
-                    required
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Vai trò
-                </label>
-                <select
-                  name="role"
-                  value={formData.role}
-                  onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  required
-                >
-                  <option value="Học sinh">Học sinh</option>
-                  <option value="Giáo viên">Giáo viên</option>
-                </select>
-              </div>
               <div className="flex justify-end gap-4 pt-4">
                 <button
                   type="button"
@@ -604,10 +525,36 @@ const ManageUsers = () => {
                   type="submit"
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
                 >
-                  Thêm người dùng
+                  {formData.id ? "Cập nhật" : "Thêm người dùng"}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal xác nhận reset mật khẩu */}
+      {showResetPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 backdrop-blur-sm">
+          <div className="bg-white p-6 rounded-xl shadow-xl w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4">Xác nhận reset mật khẩu</h3>
+            <p className="mb-6">
+              Bạn có chắc chắn muốn reset mật khẩu cho người dùng này không?
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowResetPasswordModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={confirmResetPassword}
+                className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+              >
+                Xác nhận
+              </button>
+            </div>
           </div>
         </div>
       )}
