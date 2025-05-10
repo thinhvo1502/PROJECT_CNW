@@ -12,12 +12,15 @@ import StatisticsPage from "../pages/StatisticsPage";
 import SmartSuggestionsPage from "../pages/SmartSuggestionsPage";
 import ProfilePage from "../pages/ProfilePage";
 import Pricing from "../pages/Pricing";
+import SubscriptionManagement from "../pages/SubscriptionManagement";
 import ManageExams from "../admin/ManageExams";
 import ManageQuestions from "../admin/ManageQuestions";
 import ManageUsers from "../admin/ManageUsers";
 import RevenueStatistics from "../admin/RevenueStatistics";
 import ExamAttemptsStatistics from "../admin/ExamAttemptsStatistics";
 import AdminHome from "../admin/AdminHome";
+import Checkout from "../pages/Checkout";
+import PaymentSuccess from "../pages/PaymentSuccess";
 
 export default function AppRouter() {
   return (
@@ -31,12 +34,16 @@ export default function AppRouter() {
       <Route path="/exam/:id" element={<ExamPage />} />
       <Route path="/result/:id" element={<ResultPage />} />
       <Route path="/result-detail/:id" element={<ResultDetailPage />} />
-      <Route path="/history" element={<HistoryPage />}></Route>
+      <Route path="/history" element={<HistoryPage />} />
       <Route path="/statistics" element={<StatisticsPage />} />
       <Route path="/suggestions" element={<SmartSuggestionsPage />} />
       <Route path="/profile" element={<ProfilePage />} />
       {/* subscription routes */}
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/subscription" element={<SubscriptionManagement />} />
+      <Route path="checkout" element={<Checkout />} />
+      <Route path="payment-success" element={<PaymentSuccess />} />
+
       <Route path="/admin/manage-exams" element={<ManageExams />} />
       <Route path="/admin/manage-questions" element={<ManageQuestions />} />
       <Route path="/admin/manage-users" element={<ManageUsers />} />

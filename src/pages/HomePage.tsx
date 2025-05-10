@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import React from "react";
 import { Link } from "react-router-dom";
 import {
   Bar,
@@ -11,33 +15,35 @@ import {
   ComposedChart,
 } from "recharts";
 import {
-  History,
-  Award,
   BookOpen,
   TrendingUp,
   Brain,
   ChevronRight,
+  Award,
   BarChart2,
   PlusCircle,
-  Lightbulb,
-  Calendar,
-  RefreshCw,
-  TrendingDown,
-  Sparkles,
-  Star,
-  Zap,
-  Users,
-  Crown,
   Clock,
+  Star,
+  TrendingDown,
+  Zap,
+  Lightbulb,
+  Users,
+  Sparkles,
+  CheckCircle,
+  Crown,
 } from "lucide-react";
-import { useState } from "react";
-import React from "react";
-function HomePage() {
-  const isLoggedIn = true; // Replace with actual authentication check
-  const isPremium = false; // trạng thái người dùng có gói premium hay không
+
+// Thêm đoạn mã sau vào phần import ở đầu file
+import PremiumBadge from "../components/PremiumBadge";
+
+const Home = () => {
+  // Giả định người dùng đã đăng nhập
+  const isLoggedIn = true;
   const userName = "Nguyễn Văn A";
+  const isPremium = false;
   // State để kiểm soát trạng thái dữ liệu
-  const [hasQuizData, setHasQuizData] = useState(false); // Đặt thành false để xem trạng thái trống
+  const [hasQuizData, setHasQuizData] = useState(true); // Đặt thành false để xem trạng thái trống
+
   // Dữ liệu mẫu cho biểu đồ tiến độ học tập
   const progressData = [
     { name: "T2", quizzes: 2, avgScore: 75 },
@@ -73,6 +79,7 @@ function HomePage() {
       color: "bg-purple-100",
     },
   ];
+
   // Dữ liệu mẫu cho đề thi được đề xuất
   const recommendedQuizzes = [
     {
@@ -85,8 +92,6 @@ function HomePage() {
       timeMinutes: 30,
       recommendReason: "Dựa trên điểm yếu của bạn về giao thức mạng",
       recommendIcon: <TrendingDown className="h-4 w-4 text-red-500" />,
-      isPremium: false,
-      price: 0,
     },
     {
       id: 2,
@@ -98,8 +103,6 @@ function HomePage() {
       timeMinutes: 45,
       recommendReason: "Phù hợp với sở thích của bạn về cấu trúc dữ liệu",
       recommendIcon: <Star className="h-4 w-4 text-yellow-500" />,
-      isPremium: true,
-      price: 50000,
     },
     {
       id: 3,
@@ -111,8 +114,6 @@ function HomePage() {
       timeMinutes: 40,
       recommendReason: "Giúp cải thiện kiến thức về tính kế thừa và đa hình",
       recommendIcon: <Zap className="h-4 w-4 text-purple-500" />,
-      isPremium: true,
-      price: 35000,
     },
     {
       id: 4,
@@ -124,8 +125,6 @@ function HomePage() {
       timeMinutes: 60,
       recommendReason: "Đề thi mới và phổ biến trong cộng đồng",
       recommendIcon: <Sparkles className="h-4 w-4 text-blue-500" />,
-      isPremium: true,
-      price: 75000,
     },
     {
       id: 5,
@@ -137,8 +136,6 @@ function HomePage() {
       timeMinutes: 30,
       recommendReason: "Phù hợp với trình độ hiện tại của bạn",
       recommendIcon: <Users className="h-4 w-4 text-green-500" />,
-      isPremium: false,
-      price: 0,
     },
     {
       id: 6,
@@ -150,30 +147,40 @@ function HomePage() {
       timeMinutes: 25,
       recommendReason: "Bổ sung kiến thức mới cho bạn",
       recommendIcon: <Lightbulb className="h-4 w-4 text-amber-500" />,
-      isPremium: false,
-      price: 0,
     },
   ];
-  // Định dạng giá tiền
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("vi-VN", {
-      style: "currency",
-      currency: "VND",
-    }).format(price);
-  };
-  // Format ngày giờ
-  const formatDateTime = (dateTimeString: string) => {
-    const date = new Date(dateTimeString);
-    return new Intl.DateTimeFormat("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(date);
-  };
+
+  // Nếu chưa đăng nhập, chuyển hướng đến trang đăng nhập (có thể xử lý bằng React Router)
+  if (!isLoggedIn) {
+    return (
+      <div className="container mx-auto flex flex-col items-center justify-center px-4 py-16 text-center">
+        <h1 className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl">
+          Nền tảng ôn tập kiến thức CNTT
+        </h1>
+        <p className="mb-8 max-w-2xl text-lg text-gray-600">
+          Cải thiện kiến thức công nghệ thông tin của bạn thông qua các bài trắc
+          nghiệm tương tác và thú vị
+        </p>
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <Link
+            to="/login"
+            className="px-6 py-3 bg-blue-600 text-white font-medium rounded-md text-center"
+          >
+            Bắt đầu ngay
+          </Link>
+          <Link
+            to="/signup"
+            className="px-6 py-3 border border-blue-600 text-blue-600 font-medium rounded-md text-center"
+          >
+            Tạo tài khoản mới
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col min-h-screen>">
+    <div className="flex flex-col min-h-screen">
       {/* Banner section */}
       <section className="bg-gradient-to-r from-blue-600 to-blue-800 text-white">
         <div className="container mx-auto px-4 py-12 md:py-16">
@@ -221,36 +228,6 @@ function HomePage() {
         </div>
       </section>
 
-      {/* Premium Banner (hiển thị nếu người dùng chưa có gói premium) */}
-      {!isPremium && (
-        <section className="bg-gradient-to-r from-amber-500 to-amber-600 text-white py-6">
-          <div className="container mx-auto px-4">
-            <div className="flex flex-col md:flex-row items-center justify-between max-w-6xl mx-auto">
-              <div className="flex items-center mb-4 md:mb-0">
-                <Crown className="h-8 w-8 mr-3" />
-                <div>
-                  <h2 className="text-xl font-bold">Nâng cấp lên Premium</h2>
-                  <p>Truy cập không giới hạn tất cả đề thi chất lượng cao</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <Link
-                  to="/pricing"
-                  className="px-6 py-2 bg-white text-amber-600 font-medium rounded-md hover:bg-gray-100 transition-colors"
-                >
-                  Xem gói Premium
-                </Link>
-                <Link
-                  to="/pricing#trial"
-                  className="px-6 py-2 border border-white text-white font-medium rounded-md hover:bg-amber-700 transition-colors"
-                >
-                  Dùng thử miễn phí
-                </Link>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
       {/* Progress Chart Section */}
       <section className="py-12 bg-gray-50">
         <div className="container mx-auto px-4">
@@ -349,30 +326,20 @@ function HomePage() {
                   Dựa trên lịch sử làm bài và sở thích của bạn
                 </p>
               </div>
-              <div className="flex items-center mt-2 md:mt-0 space-x-4">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-green-500 rounded-full mr-1"></div>
-                  <span className="text-sm text-gray-600">Miễn phí</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-amber-500 rounded-full mr-1"></div>
-                  <span className="text-sm text-gray-600">Premium</span>
-                </div>
-                <Link
-                  to="/quiz"
-                  className="text-blue-600 font-medium flex items-center hover:underline"
-                >
-                  Xem tất cả đề thi
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Link>
-              </div>
+              <Link
+                to="/quiz"
+                className="text-blue-600 font-medium flex items-center mt-2 md:mt-0 hover:underline"
+              >
+                Xem tất cả đề thi <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
             </div>
+
             {hasQuizData ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {recommendedQuizzes.map((quiz) => (
                   <div
                     key={quiz.id}
-                    className="bg-white border rounded-lg shadow-md hover:shadow-md transition-shadow"
+                    className="bg-white border rounded-lg shadow-sm hover:shadow-md transition-shadow"
                   >
                     <div className="p-6">
                       <div className="flex justify-between items-start mb-4">
@@ -391,7 +358,6 @@ function HomePage() {
                           <BookOpen className="h-4 w-4 mr-2" />
                           <span>{quiz.topic}</span>
                         </div>
-
                         <div className="flex items-center text-sm text-gray-600">
                           <Award className="h-4 w-4 mr-2" />
                           <span>{quiz.questionCount} câu hỏi</span>
@@ -404,42 +370,14 @@ function HomePage() {
                           {quiz.recommendIcon}
                           <span className="ml-2">{quiz.recommendReason}</span>
                         </div>
-                        {quiz.isPremium && (
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center text-sm font-medium text-amber-600">
-                              <Crown className="h-4 w-4 mr-1" />
-                              <span>Premium</span>
-                            </div>
-                            <span className="text-sm font-medium">
-                              {formatPrice(quiz.price)}
-                            </span>
-                          </div>
-                        )}
                       </div>
-                      {quiz.isPremium && !isPremium ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <Link
-                            to={`/checkout/quiz/${quiz.id}`}
-                            className="flex items-center justify-center py-2 bg-amber-500 text-white rounded-md hover:bg-amber-600 transition-colors"
-                          >
-                            <span>Mua ngay</span>
-                          </Link>
-                          <Link
-                            to="/pricing"
-                            className="flex items-center justify-center py-2 border border-amber-500 text-amber-500 rounded-md hover:bg-amber-50 transition-colors"
-                          >
-                            <Crown className="h-4 w-4 mr-1" />
-                            <span>Premium</span>
-                          </Link>
-                        </div>
-                      ) : (
-                        <Link
-                          to={`/quiz/${quiz.id}`}
-                          className="block w-full text-center py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                        >
-                          Bắt đầu
-                        </Link>
-                      )}
+
+                      <Link
+                        to={`/quiz/${quiz.id}`}
+                        className="block w-full text-center py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      >
+                        Bắt đầu
+                      </Link>
                     </div>
                   </div>
                 ))}
@@ -477,15 +415,11 @@ function HomePage() {
                       <Award className="h-4 w-4 mr-1" />
                       <span>20 câu hỏi</span>
                     </div>
-                    <div className="flex items-center text-sm font-medium text-amber-600 mb-2">
-                      <Crown className="h-4 w-4 mr-1" />
-                      <span>Premium</span>
-                    </div>
                     <Link
-                      to="/pricing"
-                      className="block w-full text-center py-1.5 bg-amber-500 text-white text-sm rounded-md hover:bg-amber-600 transition-colors"
+                      to="/quiz/2"
+                      className="block w-full text-center py-1.5 bg-blue-600 text-white text-sm rounded-md hover:bg-blue-700 transition-colors"
                     >
-                      Nâng cấp
+                      Bắt đầu
                     </Link>
                   </div>
                   <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -504,6 +438,112 @@ function HomePage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* Premium Plan Section */}
+      <section className="py-12 bg-gradient-to-r from-blue-600 to-indigo-700 text-white">
+        <div className="container mx-auto px-4">
+          <div className="max-w-6xl mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+              <div>
+                <div className="flex items-center space-x-2 mb-4">
+                  <PremiumBadge size="lg" />
+                  <h2 className="text-3xl font-bold">
+                    Nâng cao trải nghiệm học tập của bạn
+                  </h2>
+                </div>
+                <p className="text-xl mb-6 text-blue-100">
+                  Mở khóa tất cả các tính năng cao cấp và truy cập vào hơn 500+
+                  đề thi độc quyền
+                </p>
+                <ul className="space-y-4 mb-8">
+                  <li className="flex items-center">
+                    <div className="bg-blue-500 bg-opacity-30 p-1 rounded-full mr-3">
+                      <CheckCircle className="h-5 w-5 text-yellow-300" />
+                    </div>
+                    <span>Truy cập không giới hạn tất cả đề thi cao cấp</span>
+                  </li>
+                  <li className="flex items-center">
+                    <div className="bg-blue-500 bg-opacity-30 p-1 rounded-full mr-3">
+                      <CheckCircle className="h-5 w-5 text-yellow-300" />
+                    </div>
+                    <span>Gợi ý thông minh cá nhân hóa</span>
+                  </li>
+                  <li className="flex items-center">
+                    <div className="bg-blue-500 bg-opacity-30 p-1 rounded-full mr-3">
+                      <CheckCircle className="h-5 w-5 text-yellow-300" />
+                    </div>
+                    <span>Xem giải thích chi tiết cho từng câu hỏi</span>
+                  </li>
+                  <li className="flex items-center">
+                    <div className="bg-blue-500 bg-opacity-30 p-1 rounded-full mr-3">
+                      <CheckCircle className="h-5 w-5 text-yellow-300" />
+                    </div>
+                    <span>Không hiển thị quảng cáo</span>
+                  </li>
+                </ul>
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Link
+                    to="/pricing"
+                    className="px-6 py-3 bg-yellow-500 text-blue-900 font-medium rounded-md hover:bg-yellow-400 transition-colors text-center"
+                  >
+                    Khám phá các gói Premium
+                  </Link>
+                  <Link
+                    to="/quiz?premium=true"
+                    className="px-6 py-3 bg-blue-800 bg-opacity-50 text-white border border-blue-400 rounded-md hover:bg-blue-800 hover:bg-opacity-70 transition-colors text-center"
+                  >
+                    Xem đề thi cao cấp
+                  </Link>
+                </div>
+              </div>
+              <div className="hidden lg:block">
+                <div className="relative">
+                  <div className="absolute -top-6 -left-6 bg-blue-500 bg-opacity-30 p-4 rounded-lg">
+                    <div className="text-3xl font-bold">500+</div>
+                    <div className="text-sm text-blue-200">Đề thi cao cấp</div>
+                  </div>
+                  <div className="absolute -bottom-6 -right-6 bg-blue-500 bg-opacity-30 p-4 rounded-lg">
+                    <div className="text-3xl font-bold">24/7</div>
+                    <div className="text-sm text-blue-200">Hỗ trợ</div>
+                  </div>
+                  <div className="bg-blue-800 bg-opacity-50 p-8 rounded-lg">
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="bg-blue-700 bg-opacity-60 p-4 rounded-lg">
+                        <Sparkles className="h-8 w-8 text-yellow-300 mb-2" />
+                        <h3 className="font-bold mb-1">Gợi ý thông minh</h3>
+                        <p className="text-sm text-blue-200">
+                          Cá nhân hóa theo tiến độ học tập của bạn
+                        </p>
+                      </div>
+                      <div className="bg-blue-700 bg-opacity-60 p-4 rounded-lg">
+                        <BookOpen className="h-8 w-8 text-yellow-300 mb-2" />
+                        <h3 className="font-bold mb-1">Giải thích chi tiết</h3>
+                        <p className="text-sm text-blue-200">
+                          Hiểu sâu hơn về từng câu hỏi
+                        </p>
+                      </div>
+                      <div className="bg-blue-700 bg-opacity-60 p-4 rounded-lg">
+                        <Award className="h-8 w-8 text-yellow-300 mb-2" />
+                        <h3 className="font-bold mb-1">Đề thi cao cấp</h3>
+                        <p className="text-sm text-blue-200">
+                          Bao gồm đề thi mô phỏng chứng chỉ
+                        </p>
+                      </div>
+                      <div className="bg-blue-700 bg-opacity-60 p-4 rounded-lg">
+                        <TrendingUp className="h-8 w-8 text-yellow-300 mb-2" />
+                        <h3 className="font-bold mb-1">Phân tích chi tiết</h3>
+                        <p className="text-sm text-blue-200">
+                          Theo dõi tiến bộ qua thời gian
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -614,5 +654,6 @@ function HomePage() {
       </section>
     </div>
   );
-}
-export default HomePage;
+};
+
+export default Home;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Search,
   Filter,
@@ -7,9 +7,10 @@ import {
   Clock,
   BookOpen,
   BarChart3,
-  Crown,
+  Lock,
 } from "lucide-react";
 import React from "react";
+import PremiumBadge from "../components/PremiumBadge";
 interface Quiz {
   id: number;
   name: string;
@@ -27,6 +28,7 @@ interface Topic {
   name: string;
 }
 function ExamListPage() {
+  const navigate = useNavigate();
   // state cho từ khóa tìm kiếm
   const [searchKeyword, setSearchKeyword] = useState("");
   // state cho bộ lọc
@@ -34,12 +36,21 @@ function ExamListPage() {
   const [selectedDifficulty, setSelectedDifficulty] = useState<string | null>(
     null
   );
+  const [showPremiumOnly, setShowPremiumOnly] = useState(false);
   const [selectedPriceFilter, setSelectedPriceFilter] = useState<
     "all" | "free" | "premium" | "owned"
   >("all");
 
   // state cho danh sách đề thi đã lọc
   const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>([]);
+
+  // State cho modal Premium
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+
+  // Đây là giả định trạng thái premium của người dùng
+  // Trong thực tế, sẽ lấy từ state hoặc context
+  const isPremiumUser = false;
 
   // Danh sách chủ đề mẫu
   const topics: Topic[] = [
@@ -54,7 +65,6 @@ function ExamListPage() {
   // Danh sách mức độ
   const difficulties = ["Dễ", "Trung bình", "Khó"];
 
-  // Danh sách đề thi mẫu
   // Danh sách đề thi mẫu
   const quizzes: Quiz[] = [
     {
@@ -169,17 +179,12 @@ function ExamListPage() {
       );
     }
     // lọc theo giá
-    if (selectedPriceFilter !== "all") {
-      if (selectedPriceFilter === "free") {
-        results = results.filter((quiz) => !quiz.isPremium);
-      } else if (selectedPriceFilter === "premium") {
-        results = results.filter((quiz) => quiz.isPremium);
-      } else if (selectedPriceFilter === "owned") {
-        results = results.filter((quiz) => quiz.isOwned);
-      }
+    // Lọc theo Premium
+    if (showPremiumOnly) {
+      results = results.filter((quiz) => quiz.isPremium);
     }
     setFilteredQuizzes(results);
-  }, [searchKeyword, selectedTopic, selectedDifficulty, selectedPriceFilter]);
+  }, [searchKeyword, selectedTopic, selectedDifficulty, showPremiumOnly]);
 
   useEffect(() => {
     setFilteredQuizzes(quizzes);
@@ -189,7 +194,7 @@ function ExamListPage() {
     setSelectedTopic(null);
     setSelectedDifficulty(null);
     setSearchKeyword("");
-    setSelectedPriceFilter("all");
+    setShowPremiumOnly(false);
   };
   // Định dạng giá tiền
   const formatPrice = (price: number) => {
@@ -198,26 +203,37 @@ function ExamListPage() {
       currency: "VND",
     }).format(price);
   };
+  // Xử lý khi click vào đề thi Premium
+  const handleQuizClick = (quiz: Quiz) => {
+    if (quiz.isPremium && !isPremiumUser) {
+      setSelectedQuiz(quiz);
+      setShowPremiumModal(true);
+    } else {
+      navigate(`/quiz/${quiz.id}`);
+    }
+  };
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-7xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Chọn đề thi</h1>
+
         {/* Phần tìm kiếm và bộ lọc */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Thanh tìm kiếm */}
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none pb-5">
+                <Search className="h-5 w-5 text-gray-400" />
               </div>
               <input
                 type="text"
                 placeholder="Tìm kiếm đề thi..."
                 value={searchKeyword}
                 onChange={(e) => setSearchKeyword(e.target.value)}
-                className="pl-10 w-full rounded-md border border-gray-300 py-2 px-3 focus: outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="pl-10 w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               />
             </div>
+
             {/* Bộ lọc chủ đề */}
             <div>
               <label
@@ -236,7 +252,7 @@ function ExamListPage() {
                 }
                 className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
-                <option value="Tất cả chủ đề"></option>
+                <option value="">Tất cả chủ đề</option>
                 {topics.map((topic) => (
                   <option key={topic.id} value={topic.id}>
                     {topic.name}
@@ -244,7 +260,8 @@ function ExamListPage() {
                 ))}
               </select>
             </div>
-            {/* Bộ lọc độ khó */}
+
+            {/* Bộ lọc mức độ */}
             <div>
               <label
                 htmlFor="difficulty"
@@ -266,65 +283,49 @@ function ExamListPage() {
                 ))}
               </select>
             </div>
-            {/* Bộ lọc giá */}
-            <div>
-              <label
-                htmlFor="price"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Giá
-              </label>
-              <select
-                id="price"
-                value={selectedPriceFilter}
-                onChange={(e) =>
-                  setSelectedPriceFilter(
-                    e.target.value as "all" | "free" | "premium" | "owned"
-                  )
-                }
-                className="w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="all">Tất cả</option>
-                <option value="free">Miễn phí</option>
-                <option value="premium">Premium</option>
-                <option value="owned">Đã mua</option>
-              </select>
-            </div>
           </div>
-          {/* nút reset và làm bài ngẫu nhiên */}
+
+          {/* Lọc Premium và các nút khác */}
           <div className="flex flex-col sm:flex-row justify-between items-center mt-6">
-            <button
-              onClick={handleResetFilters}
-              className="flex items-center text-blue-600 hover:text-blue-800 mb-4 sm:mb-0"
-            >
-              <Filter className="h-4 w-4 mr-1" />
-              Xóa bộ lọc
-            </button>
-            <div className="flex space-x-4">
-              <Link
-                to="/pricing"
-                className="flex items-center justify-center px-4 py-2 border border-amber-500 text-amber-600 rounded-md hover:bg-amber-50 transition-colors"
+            <div className="flex items-center mb-4 sm:mb-0">
+              <label className="flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showPremiumOnly}
+                  onChange={(e) => setShowPremiumOnly(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <span className="ml-2 text-sm font-medium flex items-center">
+                  Chỉ hiển thị đề thi{" "}
+                  <PremiumBadge size="sm" className="ml-1" />
+                </span>
+              </label>
+              <button
+                onClick={handleResetFilters}
+                className="flex items-center ml-6 text-blue-600 hover:text-blue-800 text-sm"
               >
-                <Crown className="h-5 w-5 mr-2" />
-                Nâng cấp Premium
-              </Link>
-              <Link
-                to="/exam/random"
-                className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Shuffle className="h-5 w-5 mr-2" />
-                Làm bài ngẫu nhiên
-              </Link>
+                <Filter className="h-4 w-4 mr-1" />
+                Xóa bộ lọc
+              </button>
             </div>
+
+            <Link
+              to="/quiz/random"
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Shuffle className="h-5 w-5 mr-2" />
+              Làm bài ngẫu nhiên
+            </Link>
           </div>
         </div>
 
-        {/* Danh sách đề thi */}
+        {/* Kết quả tìm kiếm */}
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Danh sách đề thi</h2>
             <p className="text-gray-600">{filteredQuizzes.length} đề thi</p>
           </div>
+
           {filteredQuizzes.length === 0 ? (
             <div className="bg-white rounded-lg shadow-md p-8 text-center">
               <p className="text-gray-500 text-lg">
@@ -342,18 +343,25 @@ function ExamListPage() {
               {filteredQuizzes.map((quiz) => (
                 <div
                   key={quiz.id}
-                  className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+                  className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow relative"
                 >
+                  {quiz.isPremium && (
+                    <div className="absolute top-3 right-3">
+                      <PremiumBadge />
+                    </div>
+                  )}
                   <div className="p-6">
                     <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-semibold">{quiz.name}</h3>
+                      <h3 className="text-lg font-semibold pr-20">
+                        {quiz.name}
+                      </h3>
                       <span
-                        className={`text-xs font-medium ml-0.5 px-2 py-1 rounded-full ${quiz.difficultyColor}`}
+                        className={`text-xs font-medium px-2 py-1 rounded-full ${quiz.difficultyColor}`}
                       >
                         {quiz.difficulty}
                       </span>
                     </div>
-                    {/* 3 phần ở dưới */}
+
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center text-gray-600">
                         <BookOpen className="h-4 w-4 mr-2" />
@@ -369,12 +377,23 @@ function ExamListPage() {
                       </div>
                     </div>
 
-                    <Link
-                      to={`/exam-list/${quiz.id}`}
-                      className="block w-full text-center py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    <button
+                      onClick={() => handleQuizClick(quiz)}
+                      className={`block w-full text-center py-2 rounded-md transition-colors ${
+                        quiz.isPremium && !isPremiumUser
+                          ? "bg-gradient-to-r from-yellow-400 to-yellow-600 text-white hover:from-yellow-500 hover:to-yellow-700 flex items-center justify-center"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                      }`}
                     >
-                      Bắt đầu
-                    </Link>
+                      {quiz.isPremium && !isPremiumUser ? (
+                        <>
+                          <Lock className="h-4 w-4 mr-2" />
+                          Mở khóa
+                        </>
+                      ) : (
+                        "Bắt đầu"
+                      )}
+                    </button>
                   </div>
                 </div>
               ))}
@@ -382,6 +401,72 @@ function ExamListPage() {
           )}
         </div>
       </div>
+
+      {/* Modal Premium */}
+      {showPremiumModal && selectedQuiz && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center p-2 bg-yellow-100 rounded-full mb-4">
+                <PremiumBadge size="lg" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Đề thi Premium</h3>
+              <p className="text-gray-600">
+                Đề thi "{selectedQuiz.name}" là nội dung dành riêng cho thành
+                viên Premium.
+              </p>
+            </div>
+
+            <div className="bg-blue-50 rounded-md p-4 mb-6">
+              <h4 className="font-medium mb-2">Lợi ích của gói Premium:</h4>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
+                    <span className="text-blue-600 text-xs">✓</span>
+                  </div>
+                  <span>
+                    Truy cập tất cả đề thi cao cấp (
+                    {quizzes.filter((q) => q.isPremium).length}+ đề thi)
+                  </span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
+                    <span className="text-blue-600 text-xs">✓</span>
+                  </div>
+                  <span>Xem giải thích chi tiết cho từng câu hỏi</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
+                    <span className="text-blue-600 text-xs">✓</span>
+                  </div>
+                  <span>Không hiển thị quảng cáo</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
+                    <span className="text-blue-600 text-xs">✓</span>
+                  </div>
+                  <span>Gợi ý thông minh cá nhân hóa</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                to="/pricing"
+                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-center"
+              >
+                Nâng cấp lên Premium
+              </Link>
+              <button
+                onClick={() => setShowPremiumModal(false)}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Không, cảm ơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

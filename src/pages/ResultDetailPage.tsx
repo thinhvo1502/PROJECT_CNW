@@ -1,3 +1,5 @@
+"use client";
+
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
@@ -9,28 +11,40 @@ import {
   ArrowLeft,
   BookOpen,
 } from "lucide-react";
+
+// Thêm đoạn mã này vào phần đầu file để import PremiumBadge
+import PremiumBadge from "../components/PremiumBadge";
 import React from "react";
+// Định nghĩa kiểu dữ liệu cho câu hỏi
 interface Question {
   id: number;
   content: string;
   options: string[];
-  correctAnswer: number;
+  correctAnswer: number; // 0-3 tương ứng với A-D
   explanation?: string;
   topic: string;
 }
+
+// Định nghĩa kiểu dữ liệu cho kết quả chi tiết
 interface QuizDetailResult {
   quizId: string | number;
   quizName: string;
   userAnswers: (number | null)[];
   questions: Question[];
 }
-const ResultDetailPage = () => {
+
+const QuizResultDetail = () => {
   const { id } = useParams();
   const quizId = id || "unknown";
-  // state cho câu hỏi hiện tại
+
+  // State cho câu hỏi hiện tại
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  // state cho hiển thị/ ẩn giải thích
+
+  // State cho việc hiển thị/ẩn giải thích
   const [showExplanations, setShowExplanations] = useState<boolean[]>([]);
+
+  // Trong thực tế, dữ liệu này sẽ được lấy từ API hoặc từ state của ứng dụng
+  // Ở đây tôi sử dụng dữ liệu mẫu
   const [resultData, setResultData] = useState<QuizDetailResult>({
     quizId,
     quizName: "Kiến thức cơ bản về mạng LAN",
@@ -148,32 +162,44 @@ const ResultDetailPage = () => {
       },
     ],
   });
-  // khởi tạo trạng thái hiển thị giải thích
+
+  // Khởi tạo trạng thái hiển thị giải thích
   useEffect(() => {
     setShowExplanations(new Array(resultData.questions.length).fill(false));
   }, [resultData.questions.length]);
-  // xử lý chuyển câu hỏi
+
+  // Xử lý chuyển câu hỏi
   const goToQuestion = (index: number) => {
     if (index >= 0 && index < resultData.questions.length) {
       setCurrentQuestionIndex(index);
-      window.scrollTo(0, 0); // Cuộn lên đầu trang khi chuyển câu hỏi
+      // Cuộn lên đầu trang khi chuyển câu hỏi
+      window.scrollTo(0, 0);
     }
   };
+
+  // Xử lý hiển thị/ẩn giải thích
   const toggleExplanation = (index: number) => {
     const newShowExplanations = [...showExplanations];
     newShowExplanations[index] = !newShowExplanations[index];
     setShowExplanations(newShowExplanations);
   };
+
+  // Lấy câu hỏi hiện tại
   const currentQuestion = resultData.questions[currentQuestionIndex];
   const userAnswer = resultData.userAnswers[currentQuestionIndex];
   const isCorrect = userAnswer === currentQuestion.correctAnswer;
+
+  // Thêm vào state giả định trạng thái người dùng
+  const isPremiumUser = false; // Trong thực tế, sẽ lấy từ state hoặc context
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
           <Link
-            to="#"
+            to={`/quiz/${quizId}/result`}
             className="flex items-center text-blue-600 hover:text-blue-800 mb-4"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
@@ -182,40 +208,45 @@ const ResultDetailPage = () => {
           <h1 className="text-2xl font-bold mb-2">
             Chi tiết bài làm: {resultData.quizName}
           </h1>
-          <div className="flex items-center text-gray=600">
+          <div className="flex items-center text-gray-600">
             <BookOpen className="h-4 w-4 mr-1" />
             <span>
               Câu hỏi {currentQuestionIndex + 1} / {resultData.questions.length}
             </span>
           </div>
         </div>
+
         {/* Điều hướng câu hỏi */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex flex-wrap gap-2 mb-4">
             {resultData.questions.map((question, index) => {
               const answer = resultData.userAnswers[index];
               const correct = answer === question.correctAnswer;
+
               return (
                 <button
                   key={question.id}
                   onClick={() => goToQuestion(index)}
-                  className={`w-10 h-10 rounded-md flex items-center justify-center font-medium transition-colors ${
-                    currentQuestionIndex === index
-                      ? "ring-2 ring-blue-500 ring-offset-2"
-                      : ""
-                  } ${
-                    correct
-                      ? "bg-green-100 text-green-800 border border-green-300"
-                      : answer != null
-                      ? "bg-red-100 text-red-800 border border-red-300"
-                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                  }`}
+                  className={`w-10 h-10 rounded-md flex items-center justify-center font-medium transition-colors
+                    ${
+                      currentQuestionIndex === index
+                        ? "ring-2 ring-blue-500 ring-offset-2"
+                        : ""
+                    }
+                    ${
+                      correct
+                        ? "bg-green-100 text-green-800 border border-green-300"
+                        : answer !== null
+                        ? "bg-red-100 text-red-800 border border-red-300"
+                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                    }`}
                 >
                   {index + 1}
                 </button>
               );
             })}
           </div>
+
           <div className="flex items-center text-sm text-gray-600 mb-2">
             <div className="flex items-center mr-4">
               <div className="w-4 h-4 bg-green-100 border border-green-300 rounded-sm mr-1"></div>
@@ -231,7 +262,8 @@ const ResultDetailPage = () => {
             </div>
           </div>
         </div>
-        {/* nội dung câu hỏi */}
+
+        {/* Nội dung câu hỏi */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
@@ -243,7 +275,7 @@ const ResultDetailPage = () => {
                   Câu {currentQuestionIndex + 1}
                 </h2>
               </div>
-              {userAnswer != null && (
+              {userAnswer !== null && (
                 <div
                   className={`flex items-center ${
                     isCorrect ? "text-green-600" : "text-red-600"
@@ -260,21 +292,22 @@ const ResultDetailPage = () => {
             </div>
             <p className="text-lg">{currentQuestion.content}</p>
           </div>
+
           {/* Các đáp án */}
           <div className="space-y-3 mb-6">
             {currentQuestion.options.map((option, index) => {
               const isUserAnswer = userAnswer === index;
               const isCorrectAnswer = currentQuestion.correctAnswer === index;
               let optionClass = "border-gray-200";
-              if (isUserAnswer) {
-                optionClass = isCorrectAnswer
-                  ? "border-green-500"
-                  : "border-red-500";
+
+              if (isUserAnswer && isCorrectAnswer) {
+                optionClass = "border-green-500 bg-green-50";
               } else if (isUserAnswer && !isCorrectAnswer) {
                 optionClass = "border-red-500 bg-red-50";
               } else if (isCorrectAnswer) {
                 optionClass = "border-green-500 bg-green-50";
               }
+
               return (
                 <div
                   key={index}
@@ -282,15 +315,16 @@ const ResultDetailPage = () => {
                 >
                   <div className="flex items-center">
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 font-medium ${
-                        isUserAnswer && isCorrectAnswer
-                          ? "bg-green-600 text-white"
-                          : isUserAnswer && !isCorrectAnswer
-                          ? "bg-red-600 text-white"
-                          : isCorrectAnswer
-                          ? "bg-green-600 text-white"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 font-medium
+                        ${
+                          isUserAnswer && isCorrectAnswer
+                            ? "bg-green-600 text-white"
+                            : isUserAnswer && !isCorrectAnswer
+                            ? "bg-red-600 text-white"
+                            : isCorrectAnswer
+                            ? "bg-green-600 text-white"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
                     >
                       {String.fromCharCode(65 + index)}
                     </div>
@@ -309,11 +343,18 @@ const ResultDetailPage = () => {
               );
             })}
           </div>
+
           {/* Giải thích */}
           {currentQuestion.explanation && (
             <div className="mt-6">
               <button
-                onClick={() => toggleExplanation(currentQuestionIndex)}
+                onClick={() => {
+                  if (!isPremiumUser) {
+                    setShowPremiumModal(true);
+                  } else {
+                    toggleExplanation(currentQuestionIndex);
+                  }
+                }}
                 className="flex items-center text-blue-600 hover:text-blue-800"
               >
                 <AlertCircle className="h-5 w-5 mr-2" />
@@ -322,7 +363,7 @@ const ResultDetailPage = () => {
                   : "Xem giải thích"}
               </button>
               {showExplanations[currentQuestionIndex] && (
-                <div className="mt-3 p-4 bg-blue-50 border-blue-200 rounded-lg">
+                <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <h3 className="font-semibold mb-2">Giải thích:</h3>
                   <p>{currentQuestion.explanation}</p>
                 </div>
@@ -330,35 +371,99 @@ const ResultDetailPage = () => {
             </div>
           )}
         </div>
-        {/* Điều hướng câu hỏi */}
+
+        {/* Điều hướng giữa các câu hỏi */}
         <div className="flex justify-between">
           <button
             onClick={() => goToQuestion(currentQuestionIndex - 1)}
             disabled={currentQuestionIndex === 0}
-            className={`flex items-center px-4 py-2 rounded-md ${
-              currentQuestionIndex === 0
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-            }`}
+            className={`flex items-center px-4 py-2 rounded-md
+              ${
+                currentQuestionIndex === 0
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+              }`}
           >
             <ChevronLeft className="h-5 w-5 mr-1" />
             Câu trước
           </button>
+
           <button
             onClick={() => goToQuestion(currentQuestionIndex + 1)}
             disabled={currentQuestionIndex === resultData.questions.length - 1}
-            className={`flex items-center px-4 py-2 rounded-md ${
-              currentQuestionIndex === resultData.questions.length - 1
-                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-            }`}
+            className={`flex items-center px-4 py-2 rounded-md
+              ${
+                currentQuestionIndex === resultData.questions.length - 1
+                  ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                  : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+              }`}
           >
             Câu tiếp theo
             <ChevronRight className="h-5 w-5 ml-1" />
           </button>
         </div>
       </div>
+
+      {/* Modal Premium cho phần giải thích chi tiết */}
+      {showPremiumModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
+            <div className="text-center mb-6">
+              <div className="inline-flex items-center justify-center p-2 bg-yellow-100 rounded-full mb-4">
+                <PremiumBadge size="lg" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">Giải thích chi tiết</h3>
+              <p className="text-gray-600">
+                Xem giải thích chi tiết cho từng câu hỏi là tính năng dành riêng
+                cho thành viên Premium.
+              </p>
+            </div>
+
+            <div className="bg-blue-50 rounded-md p-4 mb-6">
+              <h4 className="font-medium mb-2">
+                Lợi ích của việc xem giải thích chi tiết:
+              </h4>
+              <ul className="space-y-2 text-sm">
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
+                    <span className="text-blue-600 text-xs">✓</span>
+                  </div>
+                  <span>Hiểu rõ hơn tại sao một đáp án là đúng hoặc sai</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
+                    <span className="text-blue-600 text-xs">✓</span>
+                  </div>
+                  <span>Giúp cải thiện kiến thức của bạn nhanh hơn</span>
+                </li>
+                <li className="flex items-start">
+                  <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
+                    <span className="text-blue-600 text-xs">✓</span>
+                  </div>
+                  <span>Tiếp cận kiến thức chuyên sâu từ các chuyên gia</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Link
+                to="/pricing"
+                className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-center"
+              >
+                Nâng cấp lên Premium
+              </Link>
+              <button
+                onClick={() => setShowPremiumModal(false)}
+                className="flex-1 py-2 px-4 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+              >
+                Không, cảm ơn
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
-export default ResultDetailPage;
+
+export default QuizResultDetail;
