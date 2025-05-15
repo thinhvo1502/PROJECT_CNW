@@ -36,7 +36,8 @@ interface AuthContextType {
   clearError: () => void;
   changePassword: (
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
+    confirmPassword: string
   ) => Promise<void>;
   refreshUserInfo: () => Promise<void>;
   updateUserProfile: (
@@ -67,7 +68,7 @@ export const AuthProvider: React.FC<{
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = "https://3c80-1-52-242-144.ngrok-free.app/api";
+  const API_URL = "https://1faa-1-52-242-144.ngrok-free.app/api";
   // Kiểm tra xem người dùng đã đăng nhập chưa khi component mount
   useEffect(() => {
     const checkLoggedIn = async () => {
@@ -92,9 +93,9 @@ export const AuthProvider: React.FC<{
           setToken(storedToken);
           setIsAuthenticated(true);
         }
-        console.log("auth: ", user);
-        // Gọi API để lấy thông tin người dùng mới nhất
-        // Cấu hình headers
+        // console.log("auth: ", user);
+        // // Gọi API để lấy thông tin người dùng mới nhất
+        // // Cấu hình headers
         // const config = {
         //   headers: {
         //     Authorization: `Bearer ${storedToken}`,
@@ -104,11 +105,11 @@ export const AuthProvider: React.FC<{
         // // Gọi API để lấy thông tin người dùng
         // const response = await axios.get(`${API_URL}/auth/me`, config);
         // console.log("response: ", response);
-        // Cập nhật state và localStorage
+        // // Cập nhật state và localStorage
         // setUser(response.data.data.user);
         // setToken(storedToken);
         // setIsAuthenticated(true);
-        // Lưu thông tin người dùng vào localStorage
+        // // Lưu thông tin người dùng vào localStorage
         // localStorage.setItem("user", JSON.stringify(response.data.data.user));
       } catch (err) {
         console.error("Error checking authentication:", err);
@@ -136,6 +137,7 @@ export const AuthProvider: React.FC<{
       });
       // Lưu token vào cookie và thông tin người dùng vào localStorage
       setCookie("auth_token", response.data.data.token, 7);
+      console.log("auth: cookie", getCookie("auth_token"));
       localStorage.setItem("user", JSON.stringify(response.data.data.user));
       // Cập nhật state
       console.log("authcontext: user", response.data.data.user);
@@ -198,12 +200,12 @@ export const AuthProvider: React.FC<{
   // Đổi mật khẩu
   const changePassword = async (
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
+    confirmPassword: string
   ) => {
     try {
       setIsLoading(true);
       setError(null);
-
       // Cấu hình headers
       const config = {
         headers: {
@@ -212,11 +214,12 @@ export const AuthProvider: React.FC<{
       };
 
       // Gọi API đổi mật khẩu
-      await axios.post(
-        `${API_URL}/auth/change-password`,
+      await axios.put(
+        `${API_URL}/auth/password`,
         {
           currentPassword,
           newPassword,
+          confirmPassword,
         },
         config
       );
@@ -224,7 +227,7 @@ export const AuthProvider: React.FC<{
       // Xử lý lỗi
       if (err.response && err.response.data) {
         setError(err.response.data.message || "Đổi mật khẩu thất bại");
-        throw new Error(err.response.data.message);
+        throw new Error("Mật khẩu cũ không đúng");
       } else {
         setError("Không thể kết nối đến máy chủ");
         throw new Error("Không thể kết nối đến máy chủ");
@@ -272,7 +275,7 @@ export const AuthProvider: React.FC<{
       console.log("userId là: ", userId);
       // Gọi API cập nhật thông tin người dùng
       const updatedUser = await updateUser(userId, userData);
-
+      console.log("về auth sau update");
       // Cập nhật state và localStorage
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));

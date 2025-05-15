@@ -2,7 +2,7 @@ import axios from "axios";
 import { getCookie } from "./cookies";
 
 // API URL
-const API_URL = "https://3c80-1-52-242-144.ngrok-free.app/api";
+const API_URL = "https://1faa-1-52-242-144.ngrok-free.app/api";
 
 // Tạo instance axios
 const api = axios.create({

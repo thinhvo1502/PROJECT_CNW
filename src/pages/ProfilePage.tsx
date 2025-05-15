@@ -133,14 +133,13 @@ const Profile = () => {
       const updateData = {
         name: editForm.name,
         email: editForm.email,
-        class: editForm.class,
-        profileImage: editForm.profileImage,
+        // class: editForm.class,
+        // profileImage: editForm.profileImage,
       };
 
       // Gọi API cập nhật thông tin người dùng
       console.log("profile: user.id", user?.id);
       await updateUserProfile(user.id, updateData);
-
       setIsEditing(false);
       showNotification("success", "Cập nhật thông tin thành công!");
     } catch (error: any) {
@@ -166,7 +165,6 @@ const Profile = () => {
   const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
     try {
       setIsLoading(true);
 
@@ -238,7 +236,8 @@ const Profile = () => {
       // Gọi API đổi mật khẩu
       await changePassword(
         passwordForm.currentPassword,
-        passwordForm.newPassword
+        passwordForm.newPassword,
+        passwordForm.confirmPassword
       );
 
       // Reset form và hiển thị thông báo thành công

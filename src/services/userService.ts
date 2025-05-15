@@ -31,9 +31,10 @@ export const updateUser = async (
   userId: string,
   userData: UpdateUserData
 ): Promise<User> => {
-  console.log("userService: ", userId);
-  const response = await api.put(`/auth/${userId}`, userData);
-  return response.data;
+  console.log("userService: ", userData);
+  const response = await api.put(`/auth/profile`, userData);
+  console.log("reponse service: ", response.data);
+  return response.data.user;
 };
 
 // Xóa người dùng (chỉ admin)
