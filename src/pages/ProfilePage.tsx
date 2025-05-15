@@ -1,5 +1,7 @@
-import { useState, useRef, type ChangeEvent } from "react";
-import { Link } from "react-router-dom";
+"use client";
+
+import { useState, useRef, useEffect, type ChangeEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   User,
   Mail,
@@ -18,59 +20,56 @@ import {
   AlertTriangle,
   CheckCircle,
   Info,
+  Crown,
+  Trash2,
 } from "lucide-react";
-import React from "react";
-interface UserProfile {
-  id: string;
-  fullName: string;
-  email: string;
-  username: string;
-  phone: string;
-  birthDate: string;
-  avatar: string;
-  createdAt: string;
-  lastLogin: string;
-  totalQuizzes: number;
-  averageScore: number;
-  completedTopics: number;
-  totalTopics: number;
-}
-// định nghĩa kiểu dữ liệu cho form đổi mật khẩu
+import { useAuth } from "../context/AuthContext";
+import { uploadProfileImage } from "../services/userService";
+
+// Định nghĩa kiểu dữ liệu cho form đổi mật khẩu
 interface PasswordChangeForm {
   currentPassword: string;
   newPassword: string;
   confirmPassword: string;
 }
-const ProfilePage = () => {
-  // Dữ liệu mẫu cho thông tin người dùng
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    id: "user123",
-    fullName: "Nguyễn Văn A",
-    email: "nguyenvana@example.com",
-    username: "nguyenvana",
-    phone: "0912345678",
-    birthDate: "1995-05-15",
-    avatar: "/placeholder.svg?height=200&width=200",
-    createdAt: "2023-01-15T08:30:00",
-    lastLogin: "2023-05-20T14:45:00",
-    totalQuizzes: 25,
-    averageScore: 78.5,
-    completedTopics: 6,
-    totalTopics: 8,
-  });
-  // state cho chế độ chỉnh sửa
+
+const Profile = () => {
+  const {
+    user,
+    changePassword,
+    updateUserProfile,
+    deleteUserAccount,
+    refreshUserInfo,
+  } = useAuth();
+  const navigate = useNavigate();
+
+  // State cho chế độ chỉnh sửa
   const [isEditing, setIsEditing] = useState(false);
-  // state cho form chỉnh sửa
-  const [editForm, setEditForm] = useState({ ...userProfile });
-  // state cho form đổi mật khẩu
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // State cho form chỉnh sửa
+  const [editForm, setEditForm] = useState({
+    name: user?.name || "",
+    email: user?.email || "",
+    username: user?.name?.toLowerCase().replace(/\s+/g, "") || "",
+    phone: "",
+    birthDate: "",
+    profileImage: user?.profileImage || "/placeholder.svg?height=200&width=200",
+    class: user?.class || "",
+  });
+
+  // State cho form đổi mật khẩu
   const [passwordForm, setPasswordForm] = useState<PasswordChangeForm>({
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
   });
-  // state cho hiển thị form đổi mật khẩu
+
+  // State cho hiển thị form đổi mật khẩu
   const [showPasswordForm, setShowPasswordForm] = useState(false);
-  // state cho thông báo
+
+  // State cho thông báo
   const [notification, setNotification] = useState<{
     show: boolean;
     type: "success" | "error" | "info";
@@ -80,24 +79,81 @@ const ProfilePage = () => {
     type: "info",
     message: "",
   });
-  // ref cho input file avatar
+
+  // Ref cho input file avatar
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // xử lý khi nhấn nút chỉnh sửa
+
+  // Tải thông tin người dùng khi component mount
+  useEffect(() => {
+    if (!user) {
+      refreshUserInfo();
+    } else {
+      // Cập nhật form với thông tin người dùng hiện tại
+      setEditForm({
+        name: user.name || "",
+        email: user.email || "",
+        username: user.name?.toLowerCase().replace(/\s+/g, "") || "",
+        phone: "",
+        birthDate: "",
+        profileImage:
+          user.profileImage || "/placeholder.svg?height=200&width=200",
+        class: user.class || "",
+      });
+    }
+  }, [user, refreshUserInfo]);
+
+  // Xử lý khi nhấn nút chỉnh sửa
   const handleEditClick = () => {
     setIsEditing(true);
-    setEditForm({ ...userProfile });
+    setEditForm({
+      name: user?.name || "",
+      email: user?.email || "",
+      username: user?.name?.toLowerCase().replace(/\s+/g, "") || "",
+      phone: "",
+      birthDate: "",
+      profileImage:
+        user?.profileImage || "/placeholder.svg?height=200&width=200",
+      class: user?.class || "",
+    });
   };
-  // xử lý khi nhấn nút hủy
+
+  // Xử lý khi nhấn nút hủy
   const handleCancelEdit = () => {
     setIsEditing(false);
   };
-  // xử lý khi nhấn nút lưu
-  const handleSaveProfile = () => {
-    // Trong thực tế, bạn sẽ gửi dữ liệu lên server ở đây
-    setUserProfile({ ...editForm });
-    setIsEditing(false);
-    showNotification("success", "Cập nhật thông tin thành công!");
+
+  // Xử lý khi nhấn nút lưu
+  const handleSaveProfile = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+
+      // Chuẩn bị dữ liệu cập nhật
+      const updateData = {
+        name: editForm.name,
+        email: editForm.email,
+        class: editForm.class,
+        profileImage: editForm.profileImage,
+      };
+
+      // Gọi API cập nhật thông tin người dùng
+      console.log("profile: user.id", user?.id);
+      await updateUserProfile(user.id, updateData);
+
+      setIsEditing(false);
+      showNotification("success", "Cập nhật thông tin thành công!");
+    } catch (error: any) {
+      showNotification(
+        "error",
+        error.message || "Cập nhật thông tin thất bại!"
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Xử lý khi thay đổi giá trị trong form
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setEditForm((prev) => ({
@@ -105,26 +161,53 @@ const ProfilePage = () => {
       [name]: value,
     }));
   };
-  // xử lý khi thay đổi avatar
-  const handleAvatarChange = (e: ChangeEvent<HTMLInputElement>) => {
+
+  // Xử lý khi thay đổi avatar
+  const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Trong thực tế, bạn sẽ upload file lên server
-      // Ở đây tôi chỉ tạo một URL tạm thời để hiển thị preview
-      const imageUrl = URL.createObjectURL(file);
+    if (!file || !user) return;
+
+    try {
+      setIsLoading(true);
+
+      // Tạo URL tạm thời để hiển thị preview
+      const previewUrl = URL.createObjectURL(file);
       setEditForm((prev) => ({
         ...prev,
-        avatar: imageUrl,
+        profileImage: previewUrl,
       }));
+
+      // Upload ảnh lên server
+      const result = await uploadProfileImage(file);
+
+      // Cập nhật URL ảnh thực tế từ server
+      setEditForm((prev) => ({
+        ...prev,
+        profileImage: result.url,
+      }));
+
+      // Cập nhật thông tin người dùng với URL ảnh mới
+      await updateUserProfile(user.id, { profileImage: result.url });
+
+      showNotification("success", "Cập nhật ảnh đại diện thành công!");
+    } catch (error: any) {
+      showNotification(
+        "error",
+        error.message || "Cập nhật ảnh đại diện thất bại!"
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
-  // xử lý khi nhấn vào avatar để mở dialog chọn file
+
+  // Xử lý khi nhấn vào avatar để mở dialog chọn file
   const handleAvatarClick = () => {
     if (isEditing && fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
-  // xử lý khi thay đổi trong form đổi mật khẩu
+
+  // Xử lý khi thay đổi giá trị trong form đổi mật khẩu
   const handlePasswordInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setPasswordForm((prev) => ({
@@ -132,10 +215,9 @@ const ProfilePage = () => {
       [name]: value,
     }));
   };
-  // xử lý khi nhấn nút đổi mật khẩu
+
   // Xử lý khi nhấn nút đổi mật khẩu
-  const handleChangePassword = () => {
-    console.log(2);
+  const handleChangePassword = async () => {
     // Kiểm tra mật khẩu mới và xác nhận mật khẩu
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       showNotification(
@@ -146,21 +228,51 @@ const ProfilePage = () => {
     }
 
     // Kiểm tra độ dài mật khẩu
-    if (passwordForm.newPassword.length < 8) {
-      showNotification("error", "Mật khẩu mới phải có ít nhất 8 ký tự!");
+    if (passwordForm.newPassword.length < 6) {
+      showNotification("error", "Mật khẩu mới phải có ít nhất 6 ký tự!");
       return;
     }
 
-    // Trong thực tế, bạn sẽ gửi yêu cầu đổi mật khẩu lên server ở đây
-    // Reset form và hiển thị thông báo thành công
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
-    setShowPasswordForm(false);
-    showNotification("success", "Đổi mật khẩu thành công!");
+    try {
+      setIsLoading(true);
+      // Gọi API đổi mật khẩu
+      await changePassword(
+        passwordForm.currentPassword,
+        passwordForm.newPassword
+      );
+
+      // Reset form và hiển thị thông báo thành công
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setShowPasswordForm(false);
+      showNotification("success", "Đổi mật khẩu thành công!");
+    } catch (error: any) {
+      showNotification("error", error.message || "Đổi mật khẩu thất bại!");
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Xử lý khi nhấn nút xóa tài khoản
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+
+    try {
+      setIsLoading(true);
+      await deleteUserAccount(user.id);
+      navigate("/login");
+    } catch (error: any) {
+      showNotification("error", error.message || "Xóa tài khoản thất bại!");
+    } finally {
+      setIsLoading(false);
+      setIsDeleting(false);
+    }
+  };
+
+  // Hiển thị thông báo
   const showNotification = (
     type: "success" | "error" | "info",
     message: string
@@ -170,10 +282,13 @@ const ProfilePage = () => {
       type,
       message,
     });
+
+    // Tự động ẩn thông báo sau 3 giây
     setTimeout(() => {
       setNotification((prev) => ({ ...prev, show: false }));
     }, 3000);
   };
+
   // Format ngày giờ
   const formatDateTime = (dateTimeString: string) => {
     const date = new Date(dateTimeString);
@@ -185,33 +300,61 @@ const ProfilePage = () => {
       minute: "2-digit",
     }).format(date);
   };
-  // format ngày
+
+  // Format ngày
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return new Intl.DateTimeFormat("vi-VN", {
       day: "2-digit",
       month: "2-digit",
-      year: "2-digit",
+      year: "numeric",
     }).format(date);
   };
-  // tính toán phần trăm hoàn thành hồ sơ
+
+  // Tính toán phần trăm hoàn thành hồ sơ
   const calculateProfileCompletion = () => {
     const fields = [
-      userProfile.fullName,
-      userProfile.email,
-      userProfile.username,
-      userProfile.phone,
-      userProfile.birthDate,
-      userProfile.avatar,
+      user?.name,
+      user?.email,
+      editForm.username,
+      editForm.phone,
+      editForm.birthDate,
+      user?.profileImage,
     ];
     const filledFields = fields.filter((field) => field && field !== "").length;
     return Math.round((filledFields / fields.length) * 100);
   };
+
   const profileCompletion = calculateProfileCompletion();
+
+  // Dữ liệu mẫu cho thống kê học tập
+  const learningStats = {
+    totalQuizzes: 25,
+    averageScore: 78.5,
+    completedTopics: 6,
+    totalTopics: 8,
+  };
+
+  // Dữ liệu mẫu cho thông tin tài khoản
+  const accountInfo = {
+    createdAt: "2023-01-15T08:30:00",
+    lastLogin: "2023-05-20T14:45:00",
+  };
+
+  // Hiển thị loading khi đang tải dữ liệu
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-5xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Hồ sơ cá nhân</h1>
+
         {/* Thông báo */}
         {notification.show && (
           <div
@@ -253,11 +396,42 @@ const ProfilePage = () => {
             </button>
           </div>
         )}
+
+        {/* Modal xác nhận xóa tài khoản */}
+        {isDeleting && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-xl font-semibold mb-4">
+                Xác nhận xóa tài khoản
+              </h3>
+              <p className="text-gray-700 mb-6">
+                Bạn có chắc chắn muốn xóa tài khoản? Hành động này không thể
+                hoàn tác và tất cả dữ liệu của bạn sẽ bị mất.
+              </p>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setIsDeleting(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Đang xử lý..." : "Xóa tài khoản"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Cột bên trái: thông tin tổng quan */}
+          {/* Cột bên trái - Thông tin tổng quan */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              {/* avatar và thông tin cơ bản */}
+              {/* Avatar và thông tin cơ bản */}
               <div className="p-6 flex flex-col items-center border-b">
                 <div className="relative mb-4 group">
                   <div
@@ -267,7 +441,12 @@ const ProfilePage = () => {
                     onClick={handleAvatarClick}
                   >
                     <img
-                      src={isEditing ? editForm.avatar : userProfile.avatar}
+                      src={
+                        isEditing
+                          ? editForm.profileImage
+                          : user?.profileImage ||
+                            "/placeholder.svg?height=200&width=200"
+                      }
                       alt="Avatar"
                       className="w-full h-full object-cover"
                     />
@@ -285,20 +464,30 @@ const ProfilePage = () => {
                     onChange={handleAvatarChange}
                   />
                 </div>
-                <h2 className="text-xl font-bold mb-1">
-                  {userProfile.fullName}
-                </h2>
-                <p className="text-gray-600 b-4">{userProfile.username}</p>
+
+                <h2 className="text-xl font-bold mb-1">{user?.name}</h2>
+                <p className="text-gray-600 mb-1">@{editForm.username}</p>
+
+                {/* Hiển thị badge cho admin */}
+                {user?.role === "admin" && (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 mb-4">
+                    <Crown className="h-3 w-3 mr-1" />
+                    Admin
+                  </span>
+                )}
+
                 {!isEditing && (
                   <button
                     onClick={handleEditClick}
                     className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    disabled={isLoading}
                   >
                     <Edit2 className="h-4 w-4 mr-2" />
                     Chỉnh sửa hồ sơ
                   </button>
                 )}
               </div>
+
               {/* Thống kê học tập */}
               <div className="p-6 border-b">
                 <h3 className="text-lg font-semibold mb-4">Thống kê học tập</h3>
@@ -309,7 +498,7 @@ const ProfilePage = () => {
                       <span>Bài kiểm tra đã làm</span>
                     </div>
                     <span className="font-medium">
-                      {userProfile.totalQuizzes}
+                      {learningStats.totalQuizzes}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -318,7 +507,7 @@ const ProfilePage = () => {
                       <span>Điểm trung bình</span>
                     </div>
                     <span className="font-medium">
-                      {userProfile.averageScore.toFixed(1)}
+                      {learningStats.averageScore.toFixed(1)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -327,10 +516,12 @@ const ProfilePage = () => {
                       <span>Chủ đề đã hoàn thành</span>
                     </div>
                     <span className="font-medium">
-                      {userProfile.completedTopics}/{userProfile.totalTopics}
+                      {learningStats.completedTopics}/
+                      {learningStats.totalTopics}
                     </span>
                   </div>
                 </div>
+
                 <div className="mt-4">
                   <Link
                     to="/statistics"
@@ -341,6 +532,7 @@ const ProfilePage = () => {
                   </Link>
                 </div>
               </div>
+
               {/* Thông tin tài khoản */}
               <div className="p-6">
                 <h3 className="text-lg font-semibold mb-4">
@@ -353,7 +545,7 @@ const ProfilePage = () => {
                       <p className="text-sm text-gray-500">
                         Ngày tạo tài khoản
                       </p>
-                      <p>{formatDateTime(userProfile.createdAt)}</p>
+                      <p>{formatDateTime(accountInfo.createdAt)}</p>
                     </div>
                   </div>
                   <div className="flex items-center text-gray-600">
@@ -362,10 +554,11 @@ const ProfilePage = () => {
                       <p className="text-sm text-gray-500">
                         Đăng nhập gần nhất
                       </p>
-                      <p>{formatDateTime(userProfile.lastLogin)}</p>
+                      <p>{formatDateTime(accountInfo.lastLogin)}</p>
                     </div>
                   </div>
                 </div>
+
                 {/* Mức độ hoàn thiện hồ sơ */}
                 <div className="mt-6">
                   <div className="flex items-center justify-between mb-2">
@@ -387,19 +580,35 @@ const ProfilePage = () => {
                     ></div>
                   </div>
                 </div>
+
+                {/* Nút xóa tài khoản */}
+                {user.role === "admin" && (
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <button
+                      onClick={() => setIsDeleting(true)}
+                      className="flex items-center text-red-600 hover:text-red-800"
+                      disabled={isLoading}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Xóa tài khoản
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-          {/* Cột bên trái - Thông tin chi tiết */}
+
+          {/* Cột bên phải - Thông tin chi tiết */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <div className="flex flex-row justify-between items-center mb-6">
+              <div className="flex justify-between items-center mb-6">
                 <h3 className="text-xl font-semibold">Thông tin cá nhân</h3>
                 {isEditing && (
                   <div className="flex space-x-2">
                     <button
                       onClick={handleCancelEdit}
                       className="flex items-center px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50"
+                      disabled={isLoading}
                     >
                       <X className="h-4 w-4 mr-1" />
                       Hủy
@@ -407,19 +616,30 @@ const ProfilePage = () => {
                     <button
                       onClick={handleSaveProfile}
                       className="flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                      disabled={isLoading}
                     >
-                      <Save className="h-4 w-4 mr-1" />
-                      Lưu
+                      {isLoading ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 mr-1 border-2 border-white border-t-transparent rounded-full"></div>
+                          Đang lưu...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="h-4 w-4 mr-1" />
+                          Lưu
+                        </>
+                      )}
                     </button>
                   </div>
                 )}
               </div>
+
               <div className="space-y-6">
                 {/* Họ và tên */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <label
-                      htmlFor="fullName"
+                      htmlFor="name"
                       className="block text-sm font-medium text-gray-700 mb-1"
                     >
                       Họ và tên
@@ -429,9 +649,9 @@ const ProfilePage = () => {
                         <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                         <input
                           type="text"
-                          id="fullName"
-                          name="fullName"
-                          value={editForm.fullName}
+                          id="name"
+                          name="name"
+                          value={editForm.name}
                           onChange={handleInputChange}
                           className="pl-10 w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
@@ -439,11 +659,12 @@ const ProfilePage = () => {
                     ) : (
                       <div className="flex items-center">
                         <User className="h-5 w-5 text-gray-400 mr-2" />
-                        <span>{userProfile.fullName}</span>
+                        <span>{user?.name}</span>
                       </div>
                     )}
                   </div>
-                  {/* username */}
+
+                  {/* Username */}
                   <div>
                     <label
                       htmlFor="username"
@@ -461,16 +682,21 @@ const ProfilePage = () => {
                           value={editForm.username}
                           onChange={handleInputChange}
                           className="pl-10 w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          disabled
                         />
+                        <p className="mt-1 text-xs text-gray-500">
+                          Tên đăng nhập không thể thay đổi.
+                        </p>
                       </div>
                     ) : (
                       <div className="flex items-center">
                         <AtSign className="h-5 w-5 text-gray-400 mr-2" />
-                        <span>{userProfile.username}</span>
+                        <span>{editForm.username}</span>
                       </div>
                     )}
                   </div>
                 </div>
+
                 {/* Email */}
                 <div>
                   <label
@@ -494,10 +720,39 @@ const ProfilePage = () => {
                   ) : (
                     <div className="flex items-center">
                       <Mail className="h-5 w-5 text-gray-400 mr-2" />
-                      <span>{userProfile.email}</span>
+                      <span>{user?.email}</span>
                     </div>
                   )}
                 </div>
+
+                {/* Lớp */}
+                <div>
+                  <label
+                    htmlFor="class"
+                    className="block text-sm font-medium text-gray-700 mb-1"
+                  >
+                    Lớp
+                  </label>
+                  {isEditing ? (
+                    <div className="relative">
+                      <BookOpen className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                      <input
+                        type="text"
+                        id="class"
+                        name="class"
+                        value={editForm.class}
+                        onChange={handleInputChange}
+                        className="pl-10 w-full rounded-md border border-gray-300 py-2 px-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center">
+                      <BookOpen className="h-5 w-5 text-gray-400 mr-2" />
+                      <span>{user?.class || "Chưa cập nhật"}</span>
+                    </div>
+                  )}
+                </div>
+
                 {/* Số điện thoại và Ngày sinh */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -522,7 +777,7 @@ const ProfilePage = () => {
                     ) : (
                       <div className="flex items-center">
                         <Phone className="h-5 w-5 text-gray-400 mr-2" />
-                        <span>{userProfile.phone}</span>
+                        <span>{editForm.phone || "Chưa cập nhật"}</span>
                       </div>
                     )}
                   </div>
@@ -549,13 +804,18 @@ const ProfilePage = () => {
                     ) : (
                       <div className="flex items-center">
                         <Calendar className="h-5 w-5 text-gray-400 mr-2" />
-                        <span>{formatDate(userProfile.birthDate)}</span>
+                        <span>
+                          {editForm.birthDate
+                            ? formatDate(editForm.birthDate)
+                            : "Chưa cập nhật"}
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
               </div>
             </div>
+
             {/* Phần đổi mật khẩu */}
             <div className="bg-white rounded-lg shadow-md p-6">
               <div className="flex justify-between items-center mb-6">
@@ -563,13 +823,15 @@ const ProfilePage = () => {
                 {!showPasswordForm && (
                   <button
                     onClick={() => setShowPasswordForm(true)}
-                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-lue-700 transition-colors"
+                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    disabled={isLoading}
                   >
                     <Lock className="h-4 w-4 mr-2" />
                     Đổi mật khẩu
                   </button>
                 )}
               </div>
+
               {showPasswordForm ? (
                 <div className="space-y-4">
                   <div>
@@ -591,6 +853,7 @@ const ProfilePage = () => {
                       />
                     </div>
                   </div>
+
                   <div>
                     <label
                       htmlFor="newPassword"
@@ -610,9 +873,10 @@ const ProfilePage = () => {
                       />
                     </div>
                     <p className="mt-1 text-xs text-gray-500">
-                      Mật khẩu phải có ít nhất 8 ký tự.
+                      Mật khẩu phải có ít nhất 6 ký tự.
                     </p>
                   </div>
+
                   <div>
                     <label
                       htmlFor="confirmPassword"
@@ -632,6 +896,7 @@ const ProfilePage = () => {
                       />
                     </div>
                   </div>
+
                   <div className="flex justify-end space-x-2 mt-6">
                     <button
                       onClick={() => {
@@ -643,14 +908,23 @@ const ProfilePage = () => {
                         });
                       }}
                       className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+                      disabled={isLoading}
                     >
                       Hủy
                     </button>
                     <button
                       onClick={handleChangePassword}
                       className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                      disabled={isLoading}
                     >
-                      Lưu thay đổi
+                      {isLoading ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 mr-1 border-2 border-white border-t-transparent rounded-full"></div>
+                          Đang xử lý...
+                        </>
+                      ) : (
+                        "Lưu thay đổi"
+                      )}
                     </button>
                   </div>
                 </div>
@@ -686,4 +960,5 @@ const ProfilePage = () => {
     </div>
   );
 };
-export default ProfilePage;
+
+export default Profile;

@@ -2,20 +2,21 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { LogOut, Loader, CheckCircle } from "lucide-react";
 import React from "react";
+import { useAuth } from "../context/AuthContext";
 const Logout = () => {
   const navigate = useNavigate();
   const [status, setStatus] = useState<"confirming" | "processing" | "success">(
     "confirming"
   );
   const [countdown, setCountdown] = useState(3);
+  const { logout } = useAuth();
   // xử lý đăng xuất
   const handleLogout = () => {
     setStatus("processing");
     // Giả lập quá trình đăng xuất (trong thực tế sẽ gọi API)
     setTimeout(() => {
       // Xóa token, cookie, session storage, etc.
-      localStorage.removeItem("auth_token");
-      sessionStorage.removeItem("user_data");
+      logout();
 
       // Cập nhật trạng thái
       setStatus("success");

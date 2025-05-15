@@ -21,22 +21,58 @@ import ExamAttemptsStatistics from "../admin/ExamAttemptsStatistics";
 import AdminHome from "../admin/AdminHome";
 import Checkout from "../pages/Checkout";
 import PaymentSuccess from "../pages/PaymentSuccess";
+import ProtectedRoute from "../components/ProtectedRoute";
 
 export default function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/login" />} />
+      <Route path="/" element={<Navigate to="/home" />} />
       <Route path="/home" element={<HomePage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/logout" element={<Logout />} />
-      <Route path="/exam" element={<ExamListPage />} />
-      <Route path="/exam/:id" element={<ExamPage />} />
+      <Route
+        path="/exam"
+        element={
+          <ProtectedRoute>
+            <ExamListPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/exam/:id"
+        element={
+          <ProtectedRoute>
+            <ExamPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/result/:id" element={<ResultPage />} />
       <Route path="/result-detail/:id" element={<ResultDetailPage />} />
-      <Route path="/history" element={<HistoryPage />} />
-      <Route path="/statistics" element={<StatisticsPage />} />
-      <Route path="/suggestions" element={<SmartSuggestionsPage />} />
+      <Route
+        path="/history"
+        element={
+          <ProtectedRoute>
+            <HistoryPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/statistics"
+        element={
+          <ProtectedRoute>
+            <StatisticsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/suggestions"
+        element={
+          <ProtectedRoute>
+            <SmartSuggestionsPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/profile" element={<ProfilePage />} />
       {/* subscription routes */}
       <Route path="/pricing" element={<Pricing />} />

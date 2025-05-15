@@ -35,8 +35,11 @@ import {
 
 // Thêm đoạn mã sau vào phần import ở đầu file
 import PremiumBadge from "../components/PremiumBadge";
+import { getCookie } from "../utils/cookies";
 
 const Home = () => {
+  const token = getCookie("auth_token");
+  console.log("token home", token);
   // Giả định người dùng đã đăng nhập
   const isLoggedIn = true;
   const userName = "Nguyễn Văn A";
