@@ -1,6 +1,6 @@
 "use client";
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Home,
   FileText,
@@ -14,6 +14,13 @@ import {
   BarChart2,
   Filter,
   ChevronDown,
+  Menu,
+  Bell,
+  User,
+  AlertTriangle,
+  Check,
+  Sparkles,
+  HelpCircle,
 } from "lucide-react";
 
 const difficultyLevels = ["Tất cả", "Dễ", "Trung bình", "Khó", "Rất khó"];
@@ -40,6 +47,16 @@ const ManageQuestions = () => {
   const [selectedTopic, setSelectedTopic] = useState("Tất cả");
   const [showDifficultyFilter, setShowDifficultyFilter] = useState(false);
   const [showTopicFilter, setShowTopicFilter] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState(null);
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [notificationType, setNotificationType] = useState("success"); // success, error
+  const [showAIHelper, setShowAIHelper] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+
   const [questions, setQuestions] = useState([
     {
       id: 1,
@@ -103,6 +120,15 @@ const ManageQuestions = () => {
     ],
   });
 
+  useEffect(() => {
+    // Simulate loading
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleAddQuestion = () => {
     setFormData({
       content: "",
@@ -146,13 +172,27 @@ const ManageQuestions = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     const newQuestion = {
-      id: Math.floor(Math.random() * 10000),
+      id: formData.id || Math.floor(Math.random() * 10000),
       content: formData.content,
       topic: formData.topic,
       difficulty: formData.difficulty,
       options: formData.options,
     };
-    setQuestions((prev) => [...prev, newQuestion]);
+
+    if (formData.id) {
+      // Update existing question
+      setQuestions((prev) =>
+        prev.map((question) =>
+          question.id === formData.id ? newQuestion : question
+        )
+      );
+      showNotificationMessage("Đã cập nhật câu hỏi thành công", "success");
+    } else {
+      // Add new question
+      setQuestions((prev) => [...prev, newQuestion]);
+      showNotificationMessage("Đã thêm câu hỏi mới thành công", "success");
+    }
+
     handleCancel();
   };
 
@@ -160,14 +200,24 @@ const ManageQuestions = () => {
     setSearchTerm(e.target.value);
   };
 
-  const handleDeleteQuestion = (id) => {
-    setQuestions((prev) => prev.filter((question) => question.id !== id));
+  const confirmDeleteQuestion = (id) => {
+    setQuestionToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteQuestion = () => {
+    setQuestions((prev) =>
+      prev.filter((question) => question.id !== questionToDelete)
+    );
+    setShowDeleteConfirm(false);
+    showNotificationMessage("Đã xóa câu hỏi thành công", "success");
   };
 
   const handleEditQuestion = (id) => {
     const questionToEdit = questions.find((question) => question.id === id);
     if (questionToEdit) {
       setFormData({
+        id: questionToEdit.id,
         content: questionToEdit.content,
         topic: questionToEdit.topic,
         difficulty: questionToEdit.difficulty,
@@ -187,6 +237,43 @@ const ManageQuestions = () => {
     setShowTopicFilter(false);
   };
 
+  const showNotificationMessage = (message, type) => {
+    setNotificationMessage(message);
+    setNotificationType(type);
+    setShowNotification(true);
+
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 3000);
+  };
+
+  const handleAIGenerate = () => {
+    if (!aiPrompt.trim()) {
+      showNotificationMessage("Vui lòng nhập nội dung để tạo câu hỏi", "error");
+      return;
+    }
+
+    // Simulate AI generating a question
+    setTimeout(() => {
+      const newQuestion = {
+        content: aiPrompt,
+        topic: "Trí tuệ nhân tạo",
+        difficulty: "Trung bình",
+        options: [
+          { id: "A", text: "Đáp án được tạo tự động A", isCorrect: false },
+          { id: "B", text: "Đáp án được tạo tự động B", isCorrect: true },
+          { id: "C", text: "Đáp án được tạo tự động C", isCorrect: false },
+          { id: "D", text: "Đáp án được tạo tự động D", isCorrect: false },
+        ],
+      };
+
+      setFormData(newQuestion);
+      setShowAIHelper(false);
+      setShowForm(true);
+      showNotificationMessage("Đã tạo câu hỏi từ AI thành công", "success");
+    }, 1500);
+  };
+
   // Lọc câu hỏi theo tìm kiếm, chủ đề và mức độ
   const filteredQuestions = questions.filter(
     (question) =>
@@ -196,27 +283,74 @@ const ManageQuestions = () => {
       (selectedTopic === "Tất cả" || question.topic === selectedTopic)
   );
 
+  if (isLoading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-gradient-to-b from-blue-50 to-white">
+        <div className="flex flex-col items-center">
+          <div className="h-16 w-16 animate-spin rounded-full border-b-2 border-t-2 border-blue-600"></div>
+          <p className="mt-4 text-lg font-medium text-blue-600">
+            Đang tải dữ liệu...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      {/* Mobile Menu Overlay */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
       {/* Sidebar */}
-      <div className="w-64 bg-gradient-to-b from-blue-700 to-blue-900 text-white shadow-lg">
-        <div className="p-6">
-          <h1 className="text-2xl font-bold mb-6">Danh mục quản lý</h1>
-          <nav>
-            <ul className="space-y-2">
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-gradient-to-b from-blue-700 to-blue-900 text-white shadow-2xl transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-full flex-col p-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">Quản trị hệ thống</h1>
+            <button
+              className="lg:hidden"
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+
+          <div className="mt-6 flex items-center space-x-3 rounded-lg bg-white/10 p-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-700">
+              <User className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="font-medium">Admin</p>
+              <p className="text-sm text-white/70">Quản trị viên</p>
+            </div>
+          </div>
+
+          <nav className="mt-8 flex-1">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+              Quản lý
+            </p>
+            <ul className="space-y-1.5">
               <li>
                 <Link
                   to="/admin/home"
-                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                  className="flex items-center rounded-lg p-3 text-white/80 transition-all hover:bg-white/10"
                 >
                   <Home className="mr-3 h-5 w-5" />
-                  <span>Home</span>
+                  <span>Trang chủ</span>
                 </Link>
               </li>
               <li>
                 <Link
                   to="/admin/manage-exams"
-                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                  className="flex items-center rounded-lg p-3 text-white/80 transition-all hover:bg-white/10"
                 >
                   <FileText className="mr-3 h-5 w-5" />
                   <span>Đề thi</span>
@@ -225,7 +359,7 @@ const ManageQuestions = () => {
               <li>
                 <Link
                   to="/admin/manage-users"
-                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                  className="flex items-center rounded-lg p-3 text-white/80 transition-all hover:bg-white/10"
                 >
                   <Users className="mr-3 h-5 w-5" />
                   <span>Người dùng</span>
@@ -234,16 +368,22 @@ const ManageQuestions = () => {
               <li>
                 <Link
                   to="/admin/manage-questions"
-                  className="flex items-center p-3 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-all"
+                  className="flex items-center rounded-lg bg-white/10 p-3 text-white transition-all hover:bg-white/20"
                 >
                   <BarChart2 className="mr-3 h-5 w-5" />
                   <span>Câu hỏi</span>
                 </Link>
               </li>
+            </ul>
+
+            <p className="mb-2 mt-8 text-xs font-semibold uppercase tracking-wider text-white/50">
+              Hệ thống
+            </p>
+            <ul className="space-y-1.5">
               <li>
                 <a
                   href="#"
-                  className="flex items-center p-3 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+                  className="flex items-center rounded-lg p-3 text-white/80 transition-all hover:bg-white/10"
                 >
                   <Settings className="mr-3 h-5 w-5" />
                   <span>Cài đặt</span>
@@ -251,54 +391,97 @@ const ManageQuestions = () => {
               </li>
             </ul>
           </nav>
+
+          <div className="mt-auto rounded-lg bg-white/10 p-4">
+            <p className="text-sm font-medium">Cần trợ giúp?</p>
+            <p className="mt-1 text-xs text-white/70">
+              Liên hệ bộ phận hỗ trợ kỹ thuật
+            </p>
+            <button className="mt-3 w-full rounded-lg bg-white py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50">
+              Liên hệ hỗ trợ
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="flex-1 overflow-auto">
-        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Quản lý Câu hỏi</h1>
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <input
-                type="text"
-                placeholder="Tìm kiếm câu hỏi..."
-                className="pl-10 pr-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                value={searchTerm}
-                onChange={handleSearch}
-              />
+        <header className="sticky top-0 z-30 bg-gradient-to-r from-blue-50 via-white to-blue-50 p-4 shadow-sm backdrop-blur-md">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <button
+                className="mr-4 rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
+                onClick={() => setIsMobileMenuOpen(true)}
+              >
+                <Menu className="h-6 w-6" />
+              </button>
+              <h1 className="text-xl font-bold text-gray-800 md:text-2xl">
+                Quản lý Câu hỏi
+              </h1>
             </div>
-            <button
-              onClick={handleAddQuestion}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-            >
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Thêm Câu hỏi
-            </button>
+
+            <div className="flex items-center space-x-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Tìm kiếm câu hỏi..."
+                  className="w-full rounded-full border border-gray-200 bg-gray-50 pl-10 pr-4 py-2 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  value={searchTerm}
+                  onChange={handleSearch}
+                />
+              </div>
+
+              <button className="relative rounded-full bg-gray-100 p-2 text-gray-600 hover:bg-gray-200">
+                <Bell className="h-5 w-5" />
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-medium text-white">
+                  3
+                </span>
+              </button>
+
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => setShowAIHelper(true)}
+                  className="flex items-center rounded-lg bg-purple-600 px-4 py-2 text-white shadow-md transition-all hover:bg-purple-700 hover:shadow-lg"
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Tạo bằng AI</span>
+                  <span className="sm:hidden">AI</span>
+                </button>
+
+                <button
+                  onClick={handleAddQuestion}
+                  className="flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  <span className="hidden sm:inline">Thêm Câu hỏi</span>
+                  <span className="sm:hidden">Thêm</span>
+                </button>
+              </div>
+            </div>
           </div>
         </header>
 
-        <main className="p-6">
+        <main className="p-4 md:p-6">
           {/* Bộ lọc */}
-          <div className="flex flex-wrap gap-4 mb-6">
+          <div className="mb-6 flex flex-wrap gap-4">
             <div className="relative">
               <button
                 onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
-                className="flex items-center text-gray-600 hover:text-gray-900 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm"
+                className="flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900"
               >
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="mr-2 h-4 w-4" />
                 Mức độ: {selectedDifficulty}
-                <ChevronDown className="h-4 w-4 ml-2" />
+                <ChevronDown className="ml-2 h-4 w-4" />
               </button>
               {showDifficultyFilter && (
-                <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
+                <div className="absolute left-0 z-10 mt-2 w-48 rounded-md border border-gray-200 bg-white shadow-lg">
                   <div className="py-1">
                     {difficultyLevels.map((difficulty) => (
                       <button
                         key={difficulty}
                         onClick={() => handleDifficultyFilter(difficulty)}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
                       >
                         {difficulty}
                       </button>
@@ -310,20 +493,20 @@ const ManageQuestions = () => {
             <div className="relative">
               <button
                 onClick={() => setShowTopicFilter(!showTopicFilter)}
-                className="flex items-center text-gray-600 hover:text-gray-900 bg-white px-4 py-2 rounded-lg border border-gray-200 shadow-sm"
+                className="flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900"
               >
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="mr-2 h-4 w-4" />
                 Chủ đề: {selectedTopic}
-                <ChevronDown className="h-4 w-4 ml-2" />
+                <ChevronDown className="ml-2 h-4 w-4" />
               </button>
               {showTopicFilter && (
-                <div className="absolute left-0 mt-2 w-64 bg-white rounded-md shadow-lg z-10 border border-gray-200 max-h-96 overflow-y-auto">
+                <div className="absolute left-0 z-10 mt-2 max-h-96 w-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
                   <div className="py-1">
                     {itTopics.map((topic) => (
                       <button
                         key={topic}
                         onClick={() => handleTopicFilter(topic)}
-                        className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
                       >
                         {topic}
                       </button>
@@ -332,11 +515,13 @@ const ManageQuestions = () => {
                 </div>
               )}
             </div>
+
+            <div className="ml-auto flex items-center space-x-2"></div>
           </div>
 
           {/* Bảng danh sách câu hỏi */}
-          <div className="bg-white shadow-sm rounded-xl mb-8 border border-gray-100">
-            <div className="p-6 border-b">
+          <div className="mb-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg transition-all duration-300 hover:shadow-xl">
+            <div className="border-b p-6">
               <h2 className="text-lg font-semibold text-gray-800">
                 Danh sách Câu hỏi
               </h2>
@@ -344,7 +529,7 @@ const ManageQuestions = () => {
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="bg-gray-50 text-gray-600 text-sm">
+                  <tr className="bg-gray-50 text-sm text-gray-600">
                     <th className="px-6 py-4 text-left font-medium">ID</th>
                     <th className="px-6 py-4 text-left font-medium">
                       Nội dung
@@ -361,15 +546,19 @@ const ManageQuestions = () => {
                 </thead>
                 <tbody>
                   {filteredQuestions.length > 0 ? (
-                    filteredQuestions.map((question) => (
+                    filteredQuestions.map((question, index) => (
                       <tr
                         key={question.id}
-                        className="border-b border-gray-100 hover:bg-gray-50"
+                        className="border-b border-gray-100 transition-colors hover:bg-blue-50/30"
+                        style={{
+                          animationDelay: `${index * 100}ms`,
+                          animation: "fadeIn 0.5s ease-in-out forwards",
+                        }}
                       >
                         <td className="px-6 py-4 text-gray-800">
                           {question.id}
                         </td>
-                        <td className="px-6 py-4 text-gray-800 font-medium">
+                        <td className="px-6 py-4 font-medium text-gray-800">
                           {question.content.length > 50
                             ? `${question.content.substring(0, 50)}...`
                             : question.content}
@@ -377,27 +566,41 @@ const ManageQuestions = () => {
                         <td className="px-6 py-4 text-gray-800">
                           {question.topic}
                         </td>
-                        <td className="px-6 py-4 text-gray-800">
-                          {question.difficulty}
+                        <td className="px-6 py-4">
+                          <span
+                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                              question.difficulty === "Dễ"
+                                ? "bg-green-100 text-green-800"
+                                : question.difficulty === "Trung bình"
+                                ? "bg-blue-100 text-blue-800"
+                                : question.difficulty === "Khó"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {question.difficulty}
+                          </span>
                         </td>
                         <td className="px-6 py-4 text-gray-800">
-                          {question.options.find((opt) => opt.isCorrect)?.id ||
-                            "N/A"}
+                          <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+                            {question.options.find((opt) => opt.isCorrect)
+                              ?.id || "N/A"}
+                          </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex space-x-3">
+                          <div className="flex flex-wrap gap-2">
                             <button
                               onClick={() => handleEditQuestion(question.id)}
-                              className="text-blue-600 hover:text-blue-800 flex items-center"
+                              className="flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 transition-all duration-300 hover:bg-blue-100 hover:scale-105"
                             >
-                              <Edit className="h-4 w-4 mr-1" />
+                              <Edit className="mr-1.5 h-4 w-4" />
                               Sửa
                             </button>
                             <button
-                              onClick={() => handleDeleteQuestion(question.id)}
-                              className="text-red-600 hover:text-red-800 flex items-center"
+                              onClick={() => confirmDeleteQuestion(question.id)}
+                              className="flex items-center rounded-lg bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-all duration-300 hover:bg-red-100 hover:scale-105"
                             >
-                              <Trash2 className="h-4 w-4 mr-1" />
+                              <Trash2 className="mr-1.5 h-4 w-4" />
                               Xóa
                             </button>
                           </div>
@@ -420,12 +623,12 @@ const ManageQuestions = () => {
           </div>
 
           {/* Thống kê */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">
+          <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="transform rounded-xl border border-gray-100 bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:bg-blue-50/30">
+              <h3 className="mb-4 text-lg font-semibold text-gray-800">
                 Thống kê theo mức độ
               </h3>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {difficultyLevels
                   .filter((d) => d !== "Tất cả")
                   .map((level) => {
@@ -434,8 +637,11 @@ const ManageQuestions = () => {
                     ).length;
                     const percentage = (count / questions.length) * 100;
                     return (
-                      <div key={level}>
-                        <div className="flex justify-between mb-1">
+                      <div
+                        key={level}
+                        className="transform transition-all duration-300 hover:scale-105"
+                      >
+                        <div className="mb-1 flex justify-between">
                           <span className="text-sm font-medium text-gray-700">
                             {level}
                           </span>
@@ -443,10 +649,13 @@ const ManageQuestions = () => {
                             {count}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
                           <div
-                            className="bg-blue-600 h-2.5 rounded-full"
-                            style={{ width: `${percentage}%` }}
+                            className="h-2.5 rounded-full bg-blue-600 transition-all duration-1000"
+                            style={{
+                              width: `${percentage}%`,
+                              animation: "growWidth 1.5s ease-out forwards",
+                            }}
                           ></div>
                         </div>
                       </div>
@@ -455,11 +664,11 @@ const ManageQuestions = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">
+            <div className="transform rounded-xl border border-gray-100 bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:bg-green-50/30">
+              <h3 className="mb-4 text-lg font-semibold text-gray-800">
                 Thống kê theo chủ đề
               </h3>
-              <div className="space-y-3 max-h-64 overflow-y-auto">
+              <div className="max-h-64 space-y-4 overflow-y-auto">
                 {itTopics
                   .filter((t) => t !== "Tất cả")
                   .map((topic) => {
@@ -471,8 +680,11 @@ const ManageQuestions = () => {
                         ? (count / questions.length) * 100
                         : 0;
                     return (
-                      <div key={topic}>
-                        <div className="flex justify-between mb-1">
+                      <div
+                        key={topic}
+                        className="transform transition-all duration-300 hover:scale-105"
+                      >
+                        <div className="mb-1 flex justify-between">
                           <span className="text-sm font-medium text-gray-700">
                             {topic}
                           </span>
@@ -480,10 +692,13 @@ const ManageQuestions = () => {
                             {count}
                           </span>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
                           <div
-                            className="bg-green-600 h-2.5 rounded-full"
-                            style={{ width: `${percentage}%` }}
+                            className="h-2.5 rounded-full bg-green-600 transition-all duration-1000"
+                            style={{
+                              width: `${percentage}%`,
+                              animation: "growWidth 1.5s ease-out forwards",
+                            }}
                           ></div>
                         </div>
                       </div>
@@ -492,79 +707,96 @@ const ManageQuestions = () => {
               </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-              <h3 className="text-lg font-semibold mb-4 text-gray-800">
+            <div className="transform rounded-xl border border-gray-100 bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:bg-purple-50/30">
+              <h3 className="mb-4 text-lg font-semibold text-gray-800">
                 Tổng quan
               </h3>
-              <div className="space-y-4">
-                <div className="flex items-center">
-                  <div className="rounded-full bg-blue-100 p-3 mr-4">
-                    <BarChart2 className="h-6 w-6 text-blue-600" />
+              <div className="space-y-6">
+                <div className="flex items-center transform transition-all duration-300 hover:scale-105">
+                  <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+                    <BarChart2 className="h-8 w-8 text-blue-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Tổng số câu hỏi</p>
-                    <p className="text-2xl font-bold text-gray-800">
+                    <p className="text-3xl font-bold text-gray-800">
                       {questions.length}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center">
-                  <div className="rounded-full bg-green-100 p-3 mr-4">
-                    <FileText className="h-6 w-6 text-green-600" />
+                <div className="flex items-center transform transition-all duration-300 hover:scale-105">
+                  <div className="mr-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                    <FileText className="h-8 w-8 text-green-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Số chủ đề</p>
-                    <p className="text-2xl font-bold text-gray-800">
+                    <p className="text-3xl font-bold text-gray-800">
                       {new Set(questions.map((q) => q.topic)).size}
                     </p>
                   </div>
+                </div>
+
+                <div className="mt-6 rounded-lg bg-blue-50 p-4">
+                  <div className="flex items-center">
+                    <HelpCircle className="mr-3 h-5 w-5 text-blue-600" />
+                    <h4 className="font-medium text-blue-800">
+                      Mẹo quản lý câu hỏi
+                    </h4>
+                  </div>
+                  <p className="mt-2 text-sm text-blue-700">
+                    Sử dụng tính năng tạo câu hỏi bằng AI để tạo nhanh các câu
+                    hỏi trắc nghiệm chất lượng cao.
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         </main>
+
+        <footer className="border-t bg-white p-4 text-center text-sm text-gray-500">
+          © 2025 Hệ thống quản lý đề thi. Bản quyền thuộc về Trường Đại học.
+        </footer>
       </div>
 
       {/* Form thêm/sửa câu hỏi */}
       {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 backdrop-blur-sm transition-all duration-300 overflow-y-auto">
-          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-3xl m-4 transform scale-100 transition-transform duration-300 animate-fade-in max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6 sticky top-0 bg-white pt-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm transition-all duration-300">
+          <div className="m-4 max-h-[90vh] w-full max-w-3xl transform overflow-y-auto rounded-2xl bg-white p-8 shadow-xl transition-transform duration-300 animate-fade-in">
+            <div className="sticky top-0 z-10 mb-6 flex items-center justify-between bg-white pt-2">
               <h2 className="text-xl font-bold text-gray-800">
                 {formData.id ? "Chỉnh sửa câu hỏi" : "Thêm câu hỏi mới"}
               </h2>
               <button
                 onClick={handleCancel}
-                className="text-gray-400 hover:text-gray-600"
+                className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-gray-700">
                   Nội dung câu hỏi
                 </label>
                 <textarea
                   name="content"
                   value={formData.content}
                   onChange={handleInputChange}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all min-h-[100px]"
+                  className="min-h-[100px] w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                   placeholder="Nhập nội dung câu hỏi"
                   required
                 ></textarea>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Chủ đề
                   </label>
                   <select
                     name="topic"
                     value={formData.topic}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                     required
                   >
                     {itTopics
@@ -576,15 +808,15 @@ const ManageQuestions = () => {
                       ))}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700">
                     Mức độ
                   </label>
                   <select
                     name="difficulty"
                     value={formData.difficulty}
                     onChange={handleInputChange}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    className="w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                     required
                   >
                     {difficultyLevels
@@ -598,14 +830,17 @@ const ManageQuestions = () => {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-4">
+              <div className="space-y-4">
+                <label className="block text-sm font-medium text-gray-700">
                   Các lựa chọn
                 </label>
                 <div className="space-y-4">
                   {formData.options.map((option, index) => (
-                    <div key={option.id} className="flex items-start space-x-4">
-                      <div className="flex items-center h-10 mt-1">
+                    <div
+                      key={option.id}
+                      className="flex items-start space-x-4 rounded-lg border border-gray-200 p-4 transition-all hover:bg-blue-50/30"
+                    >
+                      <div className="flex h-10 items-center mt-1">
                         <input
                           type="radio"
                           id={`correct-${index}`}
@@ -614,12 +849,12 @@ const ManageQuestions = () => {
                           onChange={() =>
                             handleOptionChange(index, "isCorrect", true)
                           }
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+                          className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center">
-                          <span className="bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center font-medium text-gray-700 mr-2">
+                          <span className="mr-2 flex h-8 w-8 items-center justify-center rounded-full bg-gray-100 font-medium text-gray-700">
                             {option.id}
                           </span>
                           <input
@@ -628,7 +863,7 @@ const ManageQuestions = () => {
                             onChange={(e) =>
                               handleOptionChange(index, "text", e.target.value)
                             }
-                            className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                            className="flex-1 rounded-lg border border-gray-300 px-4 py-2 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                             placeholder={`Nhập lựa chọn ${option.id}`}
                             required
                           />
@@ -639,25 +874,165 @@ const ManageQuestions = () => {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-4 pt-4 sticky bottom-0 bg-white pb-2">
+              <div className="sticky bottom-0 z-10 flex justify-end gap-4 bg-white pb-2 pt-4">
                 <button
                   type="button"
-                  className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+                  className="flex items-center rounded-lg bg-gray-100 px-6 py-3 font-medium text-gray-700 transition-colors hover:bg-gray-200"
                   onClick={handleCancel}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="flex items-center rounded-lg bg-blue-600 px-6 py-3 font-medium text-white transition-colors hover:bg-blue-700"
                 >
-                  {formData.id ? "Cập nhật câu hỏi" : "Thêm câu hỏi"}
+                  {formData.id ? (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Cập nhật
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Thêm câu hỏi
+                    </>
+                  )}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* AI Helper Modal */}
+      {showAIHelper && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="m-4 w-full max-w-2xl animate-fade-in rounded-xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center">
+                <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-purple-100">
+                  <Sparkles className="h-5 w-5 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-800">
+                  Tạo câu hỏi bằng AI
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAIHelper(false)}
+                className="rounded-full p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <p className="mb-4 text-gray-600">
+              Nhập nội dung hoặc chủ đề bạn muốn tạo câu hỏi, AI sẽ tự động tạo
+              câu hỏi trắc nghiệm với các lựa chọn.
+            </p>
+
+            <div className="mb-6">
+              <textarea
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                className="min-h-[150px] w-full rounded-lg border border-gray-300 p-4 transition-all focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50"
+                placeholder="Ví dụ: Tạo câu hỏi về mô hình OSI trong mạng máy tính"
+              ></textarea>
+            </div>
+
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowAIHelper(false)}
+                className="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleAIGenerate}
+                className="flex items-center rounded-lg bg-purple-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-purple-700"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Tạo câu hỏi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm Delete Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="m-4 w-full max-w-md animate-fade-in rounded-xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                <AlertTriangle className="h-8 w-8 text-red-600" />
+              </div>
+            </div>
+            <h3 className="mb-2 text-center text-xl font-bold text-gray-800">
+              Xác nhận xóa câu hỏi
+            </h3>
+            <p className="mb-6 text-center text-gray-600">
+              Bạn có chắc chắn muốn xóa câu hỏi này không? Hành động này không
+              thể hoàn tác.
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleDeleteQuestion}
+                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Notification */}
+      {showNotification && (
+        <div
+          className={`fixed bottom-4 right-4 z-50 flex items-center rounded-lg p-4 shadow-lg transition-all duration-300 ${
+            notificationType === "success" ? "bg-green-600" : "bg-red-600"
+          }`}
+        >
+          <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-white">
+            {notificationType === "success" ? (
+              <Check className="h-5 w-5 text-green-600" />
+            ) : (
+              <X className="h-5 w-5 text-red-600" />
+            )}
+          </div>
+          <p className="text-white">{notificationMessage}</p>
+        </div>
+      )}
+
+      {/* Global CSS for animations */}
+      <style jsx global>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes growWidth {
+          from {
+            width: 0;
+          }
+        }
+
+        .animate-fade-in {
+          animation: fadeIn 0.3s ease-out forwards;
+        }
+      `}</style>
     </div>
   );
 };
