@@ -22,6 +22,7 @@ import AdminHome from "../admin/AdminHome";
 import Checkout from "../pages/Checkout";
 import PaymentSuccess from "../pages/PaymentSuccess";
 import ProtectedRoute from "../components/ProtectedRoute";
+import ExamDetail from "../pages/ExamDetail";
 
 export default function AppRouter() {
   return (
@@ -43,11 +44,20 @@ export default function AppRouter() {
         path="/exam/:id"
         element={
           <ProtectedRoute>
+            <ExamDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/quiz/:attemptId"
+        element={
+          <ProtectedRoute>
             <ExamPage />
           </ProtectedRoute>
         }
       />
-      <Route path="/result/:id" element={<ResultPage />} />
+
+      <Route path="/quiz-result/:attemptId" element={<ResultPage />} />
       <Route path="/result-detail/:id" element={<ResultDetailPage />} />
       <Route
         path="/history"

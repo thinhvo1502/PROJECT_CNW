@@ -68,7 +68,7 @@ export const AuthProvider: React.FC<{
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const API_URL = "https://1faa-1-52-242-144.ngrok-free.app/api";
+  const API_URL = "https://f5bd-171-250-162-82.ngrok-free.app/api";
   // Kiểm tra xem người dùng đã đăng nhập chưa khi component mount
   useEffect(() => {
     const checkLoggedIn = async () => {
@@ -95,22 +95,25 @@ export const AuthProvider: React.FC<{
         }
         // console.log("auth: ", user);
         // // Gọi API để lấy thông tin người dùng mới nhất
-        // // Cấu hình headers
-        // const config = {
-        //   headers: {
-        //     Authorization: `Bearer ${storedToken}`,
-        //   },
-        // };
+        // Cấu hình headers
+        console.log("tokens load", storedToken);
+        const config = {
+          headers: {
+            Authorization: `Bearer ${storedToken}`,
+            "Content-Type": "application/json",
+          },
+        };
 
-        // // Gọi API để lấy thông tin người dùng
-        // const response = await axios.get(`${API_URL}/auth/me`, config);
-        // console.log("response: ", response);
-        // // Cập nhật state và localStorage
-        // setUser(response.data.data.user);
-        // setToken(storedToken);
-        // setIsAuthenticated(true);
-        // // Lưu thông tin người dùng vào localStorage
-        // localStorage.setItem("user", JSON.stringify(response.data.data.user));
+        // Gọi API để lấy thông tin người dùng
+        console.log("token trước res", storedToken);
+        const response = await api.get("/auth/me");
+        console.log("responsez: ", response);
+        // Cập nhật state và localStorage
+        setUser(response.data.data.user);
+        setToken(storedToken);
+        setIsAuthenticated(true);
+        // Lưu thông tin người dùng vào localStorage
+        localStorage.setItem("user", JSON.stringify(response.data.data.user));
       } catch (err) {
         console.error("Error checking authentication:", err);
         // Xóa token và thông tin người dùng không hợp lệ

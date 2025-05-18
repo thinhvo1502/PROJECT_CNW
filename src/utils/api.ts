@@ -2,13 +2,15 @@ import axios from "axios";
 import { getCookie } from "./cookies";
 
 // API URL
-const API_URL = "https://1faa-1-52-242-144.ngrok-free.app/api";
+const API_URL = "https://f5bd-171-250-162-82.ngrok-free.app/api";
 
 // Tạo instance axios
 const api = axios.create({
   baseURL: API_URL,
   headers: {
     "Content-Type": "application/json",
+    Accept: "application/json",
+    "ngrok-skip-browser-warning": "true",
   },
 });
 
@@ -22,7 +24,8 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-
+    // Thêm header để ngrok không hiển thị trang xác nhận
+    // config.headers["ngrok-skip-browser-warning"] = "true";
     return config;
   },
   (error) => {
