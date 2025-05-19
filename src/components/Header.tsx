@@ -3,12 +3,42 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BookOpen, Menu, X, User, LogOut, Settings, Crown } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
+
 const Header = () => {
   const location = useLocation();
   const isLoginPage = location.pathname === "/login";
   const isRegisterPage = location.pathname === "/register";
   const isAuthPage = isLoginPage || isRegisterPage;
   const { isAuthenticated, user, logout } = useAuth();
+
+  // Đưa các hook lên đầu component
+  const menuItems = [
+    { name: "Trang chủ", path: "/home" },
+    { name: "Làm bài", path: "/exam" },
+    { name: "Lịch sử làm bài", path: "/history" },
+    { name: "Thống kê học tập", path: "/statistics" },
+    { name: "Gợi ý thông minh", path: "/suggestions" },
+  ];
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const toggleMenu = () => {
+    setIsMenuOpen(!isMenuOpen);
+    if (isProfileOpen) setIsProfileOpen(false);
+  };
+
+  const toggleProfile = () => {
+    setIsProfileOpen(!isProfileOpen);
+    if (isMenuOpen) setIsMenuOpen(false);
+  };
+
+  const handleLogout = () => {
+    setIsProfileOpen(false);
+    navigate("/logout");
+  };
+
+  // Điều kiện render giao diện login/register
   if (isAuthPage) {
     return (
       <header className="border-b bg-white">
@@ -17,7 +47,6 @@ const Header = () => {
             <BookOpen className="h-6 w-6" />
             <span className="text-xl font-bold">IT Quiz</span>
           </Link>
-
           <div className="flex items-center gap-4">
             <Link
               to="/login"
@@ -44,29 +73,7 @@ const Header = () => {
       </header>
     );
   }
-  const menuItems = [
-    { name: "Trang chủ", path: "/home" },
-    { name: "Làm bài", path: "/exam" },
-    { name: "Lịch sử làm bài", path: "/history" },
-    { name: "Thống kê học tập", path: "/statistics" },
-    { name: "Gợi ý thông minh", path: "/suggestions" },
-  ];
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const navigate = useNavigate();
-  const toggleMenu = () => {
-    setIsMenuOpen(!isMenuOpen);
-    if (isProfileOpen) setIsProfileOpen(false);
-  };
 
-  const toggleProfile = () => {
-    setIsProfileOpen(!isProfileOpen);
-    if (isMenuOpen) setIsMenuOpen(false);
-  };
-  const handleLogout = () => {
-    setIsProfileOpen(false);
-    navigate("/logout");
-  };
   return (
     <header className="sticky top-0 z-50 bg-white border-b shadow-sm">
       <div className="container mx-auto px-4">
@@ -285,4 +292,5 @@ const Header = () => {
     </header>
   );
 };
+
 export default Header;

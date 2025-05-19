@@ -1,8 +1,8 @@
 import axios from "axios";
 import { getCookie } from "./cookies";
 
-// Cập nhật API_URL để sử dụng biến môi trường
-const API_URL = "http://localhost:5000/api";
+// API URL
+export const API_URL = "https://e5b7-116-110-41-31.ngrok-free.app/api";
 
 // Tạo instance axios
 const api = axios.create({

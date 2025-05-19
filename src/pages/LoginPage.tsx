@@ -21,12 +21,7 @@ const Login = () => {
   const from = location.state?.from?.pathname || "/";
 
   // Xử lý chuyển hướng nếu đã đăng nhập
-  useEffect(() => {
-    console.log("useEffect in Login triggered", { isAuthenticated, from });
-    if (isAuthenticated && !isLoading) {
-      navigate(from, { replace: true });
-    }
-  }, [isAuthenticated, navigate, from]);
+  useEffect(() => {}, [isAuthenticated, navigate, from]);
 
   // Xử lý hiển thị lỗi
   useEffect(() => {

@@ -1,7 +1,7 @@
 // context quản lý trạng thái đăng nhập/ đăng xuất
 import React from "react";
 import { setCookie, getCookie, deleteCookie } from "../utils/cookies";
-import api from "../utils/api";
+import api, { API_URL } from "../utils/api";
 import {
   createContext,
   useContext,
@@ -12,6 +12,8 @@ import {
 } from "react";
 import axios from "axios";
 import { updateUser, type UpdateUserData } from "../services/userService";
+import { useNavigate } from "react-router-dom"; // Thêm dòng này
+
 // Định nghĩa kiểu dữ liệu cho User
 interface User {
   id: string;
@@ -21,7 +23,7 @@ interface User {
   class?: string;
   role: "student" | "admin";
   isActive: boolean;
-  learningStats: {
+  learningStats?: {
     totalAttempts: number;
     averageScore: number;
     topicStats: {
@@ -29,8 +31,8 @@ interface User {
       total: number;
     };
   };
-  // purchasedExams: string[];
 }
+
 // Định nghĩa kiểu dữ liệu cho AuthContext
 interface AuthContextType {
   user: User | null;
@@ -56,6 +58,7 @@ interface AuthContextType {
   examId: string | null;
   setExamId: (id: string | null) => void;
 }
+
 // Định nghĩa kiểu dữ liệu cho dữ liệu đăng ký
 interface RegisterData {
   name: string;
@@ -65,9 +68,9 @@ interface RegisterData {
   profileImage?: string;
   confirmPassword: string;
 }
+
 // tạo context
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-// API URL
 
 export const AuthProvider: React.FC<{
   children: ReactNode;
@@ -79,7 +82,8 @@ export const AuthProvider: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const [examId, setExamId] = useState<string | null>(null);
 
-  const API_URL = "http://localhost:5000/api";
+  const navigate = useNavigate(); // Thêm dòng này
+
   // Kiểm tra xem người dùng đã đăng nhập chưa khi component mount
   useEffect(() => {
     const checkLoggedIn = async () => {
@@ -104,30 +108,13 @@ export const AuthProvider: React.FC<{
           setToken(storedToken);
           setIsAuthenticated(true);
         }
-        // console.log("auth: ", user);
-        // // Gọi API để lấy thông tin người dùng mới nhất
-        // Cấu hình headers
-        console.log("tokens load", storedToken);
-        const config = {
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-            "Content-Type": "application/json",
-          },
-        };
-
-        // Gọi API để lấy thông tin người dùng
-        console.log("token trước res", storedToken);
+        // Gọi API để lấy thông tin người dùng mới nhất
         const response = await api.get("/auth/me");
-        console.log("responsez: ", response);
-        // Cập nhật state và localStorage
         setUser(response.data.data.user);
         setToken(storedToken);
         setIsAuthenticated(true);
-        // Lưu thông tin người dùng vào localStorage
         localStorage.setItem("user", JSON.stringify(response.data.data.user));
       } catch (err) {
-        console.error("Error checking authentication:", err);
-        // Xóa token và thông tin người dùng không hợp lệ
         deleteCookie("auth_token");
         localStorage.removeItem("user");
         setUser(null);
@@ -152,15 +139,19 @@ export const AuthProvider: React.FC<{
       });
       // Lưu token vào cookie và thông tin người dùng vào localStorage
       setCookie("auth_token", response.data.data.token, 7);
-      console.log("auth: cookie", getCookie("auth_token"));
       localStorage.setItem("user", JSON.stringify(response.data.data.user));
       // Cập nhật state
-      console.log("authcontext: user", response.data.data.user);
       setUser(response.data.data.user);
       setToken(response.data.data.token);
       setIsAuthenticated(true);
+
+      // Điều hướng dựa vào role
+      if (response.data.data.user.role === "admin") {
+        navigate("/admin/home");
+      } else {
+        navigate("/home");
+      }
     } catch (err: any) {
-      // Xử lý lỗi
       if (err.response && err.response.data) {
         setError(err.response.data.message || "Đăng nhập thất bại");
       } else {
@@ -170,6 +161,7 @@ export const AuthProvider: React.FC<{
       setIsLoading(false);
     }
   };
+
   // đăng ký
   const register = async (userData: RegisterData) => {
     try {
@@ -178,7 +170,7 @@ export const AuthProvider: React.FC<{
 
       // gọi API đăng ký
       const response = await axios.post(`${API_URL}/auth/register`, userData);
-      console.log(response);
+
       // Lưu token vào localStorage
       localStorage.setItem("token", response.data.token);
 
@@ -187,8 +179,8 @@ export const AuthProvider: React.FC<{
       setToken(response.data.token);
       setIsAuthenticated(true);
     } catch (err: any) {
-      // Xử lý lỗi
       if (err.response && err.response.data) {
+        console.log("Lỗi đăng ký chi tiết:", err.response.data);
         setError(err.response.data.message || "Đăng ký thất bại");
       } else {
         setError("Không thể kết nối đến máy chủ");
@@ -197,22 +189,18 @@ export const AuthProvider: React.FC<{
       setIsLoading(false);
     }
   };
-  const logout = () => {
-    // Xóa token từ localStorage
-    localStorage.removeItem("token");
 
-    // Cập nhật state
+  const logout = () => {
+    localStorage.removeItem("token");
     setUser(null);
     setToken(null);
     setIsAuthenticated(false);
   };
-  // Xóa thông báo lỗi
+
   const clearError = () => {
     setError(null);
   };
-  // đổi mật khẩu
 
-  // Đổi mật khẩu
   const changePassword = async (
     currentPassword: string,
     newPassword: string,
@@ -221,14 +209,11 @@ export const AuthProvider: React.FC<{
     try {
       setIsLoading(true);
       setError(null);
-      // Cấu hình headers
       const config = {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       };
-
-      // Gọi API đổi mật khẩu
       await axios.put(
         `${API_URL}/auth/password`,
         {
@@ -239,7 +224,6 @@ export const AuthProvider: React.FC<{
         config
       );
     } catch (err: any) {
-      // Xử lý lỗi
       if (err.response && err.response.data) {
         setError(err.response.data.message || "Đổi mật khẩu thất bại");
         throw new Error("Mật khẩu cũ không đúng");
@@ -251,35 +235,31 @@ export const AuthProvider: React.FC<{
       setIsLoading(false);
     }
   };
-  // Hàm để tải lại thông tin người dùng
+
   const refreshUserInfo = async () => {
     try {
       setIsLoading(true);
       const storedToken = localStorage.getItem("token");
-
       if (!storedToken) {
         setIsLoading(false);
         return;
       }
-
       const config = {
         headers: {
           Authorization: `Bearer ${storedToken}`,
         },
       };
-
       const response = await axios.get(`${API_URL}/auth/me`, config);
-
       setUser(response.data.user);
       setToken(storedToken);
       setIsAuthenticated(true);
     } catch (err) {
-      console.error("Error refreshing user info:", err);
+      // handle error
     } finally {
       setIsLoading(false);
     }
   };
-  // Cập nhật thông tin người dùng
+
   const updateUserProfile = async (
     userId: string,
     userData: UpdateUserData
@@ -287,17 +267,11 @@ export const AuthProvider: React.FC<{
     try {
       setIsLoading(true);
       setError(null);
-      console.log("userId là: ", userId);
-      // Gọi API cập nhật thông tin người dùng
       const updatedUser = await updateUser(userId, userData);
-      console.log("về auth sau update");
-      // Cập nhật state và localStorage
       setUser(updatedUser);
       localStorage.setItem("user", JSON.stringify(updatedUser));
-
       return updatedUser;
     } catch (err: any) {
-      // Xử lý lỗi
       if (err.response && err.response.data) {
         setError(err.response.data.message || "Cập nhật thông tin thất bại");
         throw new Error(err.response.data.message);
@@ -310,19 +284,13 @@ export const AuthProvider: React.FC<{
     }
   };
 
-  // Xóa tài khoản người dùng
   const deleteUserAccount = async (userId: string) => {
     try {
       setIsLoading(true);
       setError(null);
-
-      // Gọi API xóa tài khoản
       await api.delete(`/users/${userId}`);
-
-      // Đăng xuất sau khi xóa tài khoản
       logout();
     } catch (err: any) {
-      // Xử lý lỗi
       if (err.response && err.response.data) {
         setError(err.response.data.message || "Xóa tài khoản thất bại");
         throw new Error(err.response.data.message);
@@ -334,7 +302,7 @@ export const AuthProvider: React.FC<{
       setIsLoading(false);
     }
   };
-  // Giá trị context
+
   const contextValue = useMemo(
     () => ({
       user,
@@ -371,10 +339,12 @@ export const AuthProvider: React.FC<{
       setExamId,
     ]
   );
+
   return (
     <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 };
+
 // hook sử dụng authcontext
 export const useAuth = () => {
   const context = useContext(AuthContext);

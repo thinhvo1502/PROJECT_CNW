@@ -1,6 +1,8 @@
 "use client";
 import { Link } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import axios from "axios";
+import { debounce } from "lodash";
 import {
   Home,
   FileText,
@@ -23,22 +25,19 @@ import {
   HelpCircle,
 } from "lucide-react";
 
-const difficultyLevels = ["Tất cả", "Dễ", "Trung bình", "Khó", "Rất khó"];
+const API_URL = "https://e5b7-116-110-41-31.ngrok-free.app/api/questions";
+const PAGE_SIZE = 10;
 
-// Danh sách chủ đề CNTT
-const itTopics = [
-  "Tất cả",
-  "Kỹ thuật phần mềm",
-  "Kỹ thuật lập trình",
-  "Trí tuệ nhân tạo",
-  "Cơ sở dữ liệu",
-  "Mạng máy tính",
-  "An toàn thông tin",
-  "Hệ điều hành",
-  "Kiến trúc máy tính",
-  "Công nghệ Web",
-  "Điện toán đám mây",
-];
+// Map English difficulty names to Vietnamese and vice versa
+const difficultyMap = {
+  Easy: "Dễ",
+  Medium: "Trung bình",
+  Hard: "Khó",
+  "Very Hard": "Rất khó",
+};
+const vietnameseToEnglishDifficultyMap = Object.fromEntries(
+  Object.entries(difficultyMap).map(([k, v]) => [v, k])
+);
 
 const ManageQuestions = () => {
   const [showForm, setShowForm] = useState(false);
@@ -53,65 +52,19 @@ const ManageQuestions = () => {
   const [questionToDelete, setQuestionToDelete] = useState(null);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState("");
-  const [notificationType, setNotificationType] = useState("success"); // success, error
+  const [notificationType, setNotificationType] = useState("success");
   const [showAIHelper, setShowAIHelper] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
-
-  const [questions, setQuestions] = useState([
-    {
-      id: 1,
-      content: "Mô hình OSI có bao nhiêu tầng?",
-      topic: "Mạng máy tính",
-      difficulty: "Dễ",
-      options: [
-        { id: "A", text: "5 tầng", isCorrect: false },
-        { id: "B", text: "6 tầng", isCorrect: false },
-        { id: "C", text: "7 tầng", isCorrect: true },
-        { id: "D", text: "8 tầng", isCorrect: false },
-      ],
-    },
-    {
-      id: 2,
-      content: "Thuật toán nào sau đây không phải là thuật toán sắp xếp?",
-      topic: "Kỹ thuật lập trình",
-      difficulty: "Trung bình",
-      options: [
-        { id: "A", text: "Bubble Sort", isCorrect: false },
-        { id: "B", text: "Quick Sort", isCorrect: false },
-        { id: "C", text: "Binary Search", isCorrect: true },
-        { id: "D", text: "Merge Sort", isCorrect: false },
-      ],
-    },
-    {
-      id: 3,
-      content: "Khóa chính (Primary Key) trong CSDL có đặc điểm nào?",
-      topic: "Cơ sở dữ liệu",
-      difficulty: "Dễ",
-      options: [
-        { id: "A", text: "Có thể trùng lặp", isCorrect: false },
-        { id: "B", text: "Có thể null", isCorrect: false },
-        { id: "C", text: "Không thể trùng lặp và không null", isCorrect: true },
-        { id: "D", text: "Không có ràng buộc gì", isCorrect: false },
-      ],
-    },
-    {
-      id: 4,
-      content: "Thuật toán học máy nào phù hợp cho bài toán phân loại?",
-      topic: "Trí tuệ nhân tạo",
-      difficulty: "Khó",
-      options: [
-        { id: "A", text: "Linear Regression", isCorrect: false },
-        { id: "B", text: "Random Forest", isCorrect: true },
-        { id: "C", text: "K-means", isCorrect: false },
-        { id: "D", text: "Principal Component Analysis", isCorrect: false },
-      ],
-    },
-  ]);
-
+  const [questions, setQuestions] = useState([]);
+  const [topics, setTopics] = useState(["Tất cả"]);
+  const [difficulties, setDifficulties] = useState(["Tất cả"]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [topicIdMap, setTopicIdMap] = useState(new Map());
   const [formData, setFormData] = useState({
     content: "",
-    topic: itTopics[1],
-    difficulty: difficultyLevels[1],
+    topic: "",
+    difficulty: "",
     options: [
       { id: "A", text: "", isCorrect: false },
       { id: "B", text: "", isCorrect: false },
@@ -120,20 +73,163 @@ const ManageQuestions = () => {
     ],
   });
 
+  // Fetch all topics and difficulties from API only
   useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 800);
+    const fetchAllQuestions = async () => {
+      try {
+        setIsLoading(true);
+        let allQuestions = [];
+        let page = 1;
+        let totalPages = 1;
 
-    return () => clearTimeout(timer);
+        // Lặp qua tất cả các trang để lấy toàn bộ câu hỏi
+        do {
+          const params = new URLSearchParams();
+          params.append("page", page.toString());
+          params.append("limit", "100"); // lấy nhiều nhất có thể mỗi lần
+          const response = await axios.get(`${API_URL}?${params.toString()}`, {
+            headers: { "ngrok-skip-browser-warning": "true" },
+          });
+          const data = response.data.data || [];
+          allQuestions = allQuestions.concat(data);
+          totalPages = response.data.pagination?.pages || 1;
+          page++;
+        } while (page <= totalPages);
+
+        // Tổng hợp topic (name và id) và difficulty
+        const topicMap = new Map();
+        const difficultySet = new Set();
+
+        allQuestions.forEach((q) => {
+          // Chủ đề
+          if (q.topic) {
+            let topicName = "";
+            let topicId = "";
+            if (typeof q.topic === "object" && q.topic !== null) {
+              topicName = q.topic.name;
+              topicId = q.topic._id || q.topic.id || topicName;
+            } else {
+              topicName = q.topic;
+              topicId = q.topic;
+            }
+            if (topicName) topicMap.set(topicName, topicId);
+          }
+          // Mức độ
+          if (q.difficulty) {
+            let difficultyName =
+              typeof q.difficulty === "object" && q.difficulty !== null
+                ? q.difficulty.name
+                : q.difficulty;
+            difficultyName = difficultyMap[difficultyName] || difficultyName;
+            if (difficultyName) difficultySet.add(difficultyName);
+          }
+        });
+
+        setTopics(["Tất cả", ...Array.from(topicMap.keys())]);
+        setTopicIdMap(topicMap); // Lưu map name -> id
+        setDifficulties(["Tất cả", ...Array.from(difficultySet)]);
+
+        // Khởi tạo formData
+        const topicsArray = Array.from(topicMap.keys());
+        const difficultiesArray = Array.from(difficultySet);
+        if (topicsArray.length > 0) {
+          setFormData((prev) => ({ ...prev, topic: topicsArray[0] }));
+        }
+        if (difficultiesArray.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            difficulty: difficultiesArray[0],
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching metadata:", error);
+        setTopics(["Tất cả"]);
+        setDifficulties(["Tất cả"]);
+        showNotificationMessage("Lỗi khi tải danh sách bộ lọc!", "error");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAllQuestions();
   }, []);
+
+  // Fetch questions
+  const fetchQuestions = async () => {
+    try {
+      setIsLoading(true);
+      const params = new URLSearchParams();
+      params.append("page", currentPage.toString());
+      params.append("limit", PAGE_SIZE.toString());
+      if (searchTerm) params.append("search", searchTerm);
+      if (selectedDifficulty !== "Tất cả") {
+        const apiDifficulty =
+          vietnameseToEnglishDifficultyMap[selectedDifficulty] ||
+          selectedDifficulty;
+        params.append("difficulty", apiDifficulty);
+      }
+      if (selectedTopic !== "Tất cả") {
+        const topicId = topicIdMap.get(selectedTopic) || selectedTopic;
+        params.append("topic", topicId);
+      }
+
+      const response = await axios.get(`${API_URL}?${params.toString()}`, {
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+      const data = response.data.data || [];
+      setQuestions(data);
+      setTotalPages(response.data.pagination?.pages || 1);
+
+      if (data.length === 0 && currentPage > 1) {
+        setCurrentPage(1); // Reset to first page if current page has no results
+      }
+    } catch (error) {
+      console.error("Error fetching questions:", error);
+      // Generate some sample data if API fails
+      const sampleQuestions = generateSampleQuestions();
+      setQuestions(sampleQuestions);
+      setTotalPages(Math.ceil(sampleQuestions.length / PAGE_SIZE));
+      showNotificationMessage(
+        "Lỗi khi tải dữ liệu câu hỏi! Đang hiển thị dữ liệu mẫu.",
+        "error"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add this helper function to generate sample data when API fails
+  const generateSampleQuestions = () => {
+    const sampleTopics = topics.filter((t) => t !== "Tất cả");
+    const sampleDifficulties = difficulties.filter((d) => d !== "Tất cả");
+
+    return Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1,
+      content: `Câu hỏi mẫu ${i + 1} cho trường hợp API không hoạt động`,
+      topic: sampleTopics[i % sampleTopics.length] || "Lập trình",
+      difficulty:
+        sampleDifficulties[i % sampleDifficulties.length] || "Trung bình",
+      options: [
+        { id: "A", text: "Lựa chọn A", isCorrect: i % 4 === 0 },
+        { id: "B", text: "Lựa chọn B", isCorrect: i % 4 === 1 },
+        { id: "C", text: "Lựa chọn C", isCorrect: i % 4 === 2 },
+        { id: "D", text: "Lựa chọn D", isCorrect: i % 4 === 3 },
+      ],
+      correctAnswer: String.fromCharCode(65 + (i % 4)), // A, B, C, or D
+    }));
+  };
+
+  useEffect(() => {
+    fetchQuestions();
+    // eslint-disable-next-line
+  }, [currentPage, searchTerm, selectedDifficulty, selectedTopic]);
 
   const handleAddQuestion = () => {
     setFormData({
       content: "",
-      topic: itTopics[1],
-      difficulty: difficultyLevels[1],
+      topic: topics[1] || "",
+      difficulty: difficulties[1] || "",
       options: [
         { id: "A", text: "", isCorrect: false },
         { id: "B", text: "", isCorrect: false },
@@ -157,7 +253,6 @@ const ManageQuestions = () => {
     const newOptions = [...formData.options];
     newOptions[index] = { ...newOptions[index], [field]: value };
 
-    // Nếu đang đặt một lựa chọn là đúng, đặt tất cả các lựa chọn khác là sai
     if (field === "isCorrect" && value === true) {
       newOptions.forEach((option, i) => {
         if (i !== index) {
@@ -171,34 +266,20 @@ const ManageQuestions = () => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const newQuestion = {
-      id: formData.id || Math.floor(Math.random() * 10000),
-      content: formData.content,
-      topic: formData.topic,
-      difficulty: formData.difficulty,
-      options: formData.options,
-    };
-
-    if (formData.id) {
-      // Update existing question
-      setQuestions((prev) =>
-        prev.map((question) =>
-          question.id === formData.id ? newQuestion : question
-        )
-      );
-      showNotificationMessage("Đã cập nhật câu hỏi thành công", "success");
-    } else {
-      // Add new question
-      setQuestions((prev) => [...prev, newQuestion]);
-      showNotificationMessage("Đã thêm câu hỏi mới thành công", "success");
-    }
-
     handleCancel();
+    showNotificationMessage(
+      "Chức năng này cần kết nối API để lưu dữ liệu!",
+      "error"
+    );
   };
 
-  const handleSearch = (e) => {
-    setSearchTerm(e.target.value);
-  };
+  const handleSearch = useCallback(
+    debounce((value) => {
+      setSearchTerm(value);
+      setCurrentPage(1);
+    }, 300),
+    []
+  );
 
   const confirmDeleteQuestion = (id) => {
     setQuestionToDelete(id);
@@ -206,22 +287,41 @@ const ManageQuestions = () => {
   };
 
   const handleDeleteQuestion = () => {
-    setQuestions((prev) =>
-      prev.filter((question) => question.id !== questionToDelete)
-    );
     setShowDeleteConfirm(false);
-    showNotificationMessage("Đã xóa câu hỏi thành công", "success");
+    showNotificationMessage(
+      "Chức năng này cần kết nối API để xóa dữ liệu!",
+      "error"
+    );
   };
 
   const handleEditQuestion = (id) => {
-    const questionToEdit = questions.find((question) => question.id === id);
+    const questionToEdit = questions.find(
+      (question) => question.id === id || question._id === id
+    );
     if (questionToEdit) {
       setFormData({
-        id: questionToEdit.id,
+        id: questionToEdit.id || questionToEdit._id,
         content: questionToEdit.content,
-        topic: questionToEdit.topic,
-        difficulty: questionToEdit.difficulty,
-        options: [...questionToEdit.options],
+        topic:
+          typeof questionToEdit.topic === "object" &&
+          questionToEdit.topic !== null
+            ? questionToEdit.topic.name
+            : questionToEdit.topic,
+        difficulty:
+          typeof questionToEdit.difficulty === "object" &&
+          questionToEdit.difficulty !== null
+            ? difficultyMap[questionToEdit.difficulty.name] ||
+              questionToEdit.difficulty.name
+            : difficultyMap[questionToEdit.difficulty] ||
+              questionToEdit.difficulty,
+        options: Array.isArray(questionToEdit.options)
+          ? [...questionToEdit.options]
+          : [
+              { id: "A", text: "", isCorrect: false },
+              { id: "B", text: "", isCorrect: false },
+              { id: "C", text: "", isCorrect: false },
+              { id: "D", text: "", isCorrect: false },
+            ],
       });
       setShowForm(true);
     }
@@ -230,11 +330,13 @@ const ManageQuestions = () => {
   const handleDifficultyFilter = (difficulty) => {
     setSelectedDifficulty(difficulty);
     setShowDifficultyFilter(false);
+    setCurrentPage(1);
   };
 
   const handleTopicFilter = (topic) => {
     setSelectedTopic(topic);
     setShowTopicFilter(false);
+    setCurrentPage(1);
   };
 
   const showNotificationMessage = (message, type) => {
@@ -252,13 +354,15 @@ const ManageQuestions = () => {
       showNotificationMessage("Vui lòng nhập nội dung để tạo câu hỏi", "error");
       return;
     }
-
-    // Simulate AI generating a question
     setTimeout(() => {
       const newQuestion = {
         content: aiPrompt,
-        topic: "Trí tuệ nhân tạo",
-        difficulty: "Trung bình",
+        topic: topics.includes("Trí tuệ nhân tạo")
+          ? "Trí tuệ nhân tạo"
+          : topics[1] || "",
+        difficulty: difficulties.includes("Trung bình")
+          ? "Trung bình"
+          : difficulties[1] || "",
         options: [
           { id: "A", text: "Đáp án được tạo tự động A", isCorrect: false },
           { id: "B", text: "Đáp án được tạo tự động B", isCorrect: true },
@@ -266,7 +370,6 @@ const ManageQuestions = () => {
           { id: "D", text: "Đáp án được tạo tự động D", isCorrect: false },
         ],
       };
-
       setFormData(newQuestion);
       setShowAIHelper(false);
       setShowForm(true);
@@ -274,14 +377,26 @@ const ManageQuestions = () => {
     }, 1500);
   };
 
-  // Lọc câu hỏi theo tìm kiếm, chủ đề và mức độ
-  const filteredQuestions = questions.filter(
-    (question) =>
-      question.content.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      (selectedDifficulty === "Tất cả" ||
-        question.difficulty === selectedDifficulty) &&
-      (selectedTopic === "Tất cả" || question.topic === selectedTopic)
-  );
+  // Pagination logic
+  const getPaginationRange = () => {
+    const maxPagesToShow = 5;
+    const halfRange = Math.floor(maxPagesToShow / 2);
+    let start = Math.max(1, currentPage - halfRange);
+    const end = Math.min(totalPages, start + maxPagesToShow - 1);
+
+    if (end === totalPages) {
+      start = Math.max(1, end - maxPagesToShow + 1);
+    }
+
+    const pages = [];
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    return { start, end, pages };
+  };
+
+  const { start, end, pages } = getPaginationRange();
 
   if (isLoading) {
     return (
@@ -298,7 +413,6 @@ const ManageQuestions = () => {
 
   return (
     <div className="flex min-h-screen bg-gradient-to-b from-blue-50 to-white">
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black bg-opacity-50 lg:hidden"
@@ -306,7 +420,6 @@ const ManageQuestions = () => {
         ></div>
       )}
 
-      {/* Sidebar */}
       <div
         className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-gradient-to-b from-blue-700 to-blue-900 text-white shadow-2xl transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
           isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
@@ -404,7 +517,6 @@ const ManageQuestions = () => {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="flex-1 overflow-auto">
         <header className="sticky top-0 z-30 bg-gradient-to-r from-blue-50 via-white to-blue-50 p-4 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between">
@@ -427,8 +539,7 @@ const ManageQuestions = () => {
                   type="text"
                   placeholder="Tìm kiếm câu hỏi..."
                   className="w-full rounded-full border border-gray-200 bg-gray-50 pl-10 pr-4 py-2 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  value={searchTerm}
-                  onChange={handleSearch}
+                  onChange={(e) => handleSearch(e.target.value)}
                 />
               </div>
 
@@ -463,12 +574,15 @@ const ManageQuestions = () => {
         </header>
 
         <main className="p-4 md:p-6">
-          {/* Bộ lọc */}
-          <div className="mb-6 flex flex-wrap gap-4">
+          <div className="mb-6 flex flex-wrap items-center gap-4">
             <div className="relative">
               <button
                 onClick={() => setShowDifficultyFilter(!showDifficultyFilter)}
-                className="flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900"
+                className={`flex items-center rounded-lg border px-4 py-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 ${
+                  selectedDifficulty !== "Tất cả"
+                    ? "border-blue-300 bg-blue-50 text-blue-700"
+                    : "border-gray-200 bg-white"
+                }`}
               >
                 <Filter className="mr-2 h-4 w-4" />
                 Mức độ: {selectedDifficulty}
@@ -477,11 +591,15 @@ const ManageQuestions = () => {
               {showDifficultyFilter && (
                 <div className="absolute left-0 z-10 mt-2 w-48 rounded-md border border-gray-200 bg-white shadow-lg">
                   <div className="py-1">
-                    {difficultyLevels.map((difficulty) => (
+                    {difficulties.map((difficulty) => (
                       <button
                         key={difficulty}
                         onClick={() => handleDifficultyFilter(difficulty)}
-                        className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        className={`block w-full px-4 py-2 text-left text-sm transition-colors hover:bg-blue-50 hover:text-blue-700 ${
+                          selectedDifficulty === difficulty
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "text-gray-700"
+                        }`}
                       >
                         {difficulty}
                       </button>
@@ -493,7 +611,11 @@ const ManageQuestions = () => {
             <div className="relative">
               <button
                 onClick={() => setShowTopicFilter(!showTopicFilter)}
-                className="flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900"
+                className={`flex items-center rounded-lg border px-4 py-2 text-gray-600 shadow-sm transition-all hover:bg-gray-50 hover:text-gray-900 ${
+                  selectedTopic !== "Tất cả"
+                    ? "border-blue-300 bg-blue-50 text-blue-700"
+                    : "border-gray-200 bg-white"
+                }`}
               >
                 <Filter className="mr-2 h-4 w-4" />
                 Chủ đề: {selectedTopic}
@@ -502,11 +624,15 @@ const ManageQuestions = () => {
               {showTopicFilter && (
                 <div className="absolute left-0 z-10 mt-2 max-h-96 w-64 overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg">
                   <div className="py-1">
-                    {itTopics.map((topic) => (
+                    {topics.map((topic) => (
                       <button
                         key={topic}
                         onClick={() => handleTopicFilter(topic)}
-                        className="block w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-blue-50 hover:text-blue-700"
+                        className={`block w-full px-4 py-2 text-left text-sm transition-colors hover:bg-blue-50 hover:text-blue-700 ${
+                          selectedTopic === topic
+                            ? "bg-blue-50 text-blue-700 font-medium"
+                            : "text-gray-700"
+                        }`}
                       >
                         {topic}
                       </button>
@@ -515,11 +641,22 @@ const ManageQuestions = () => {
                 </div>
               )}
             </div>
-
-            <div className="ml-auto flex items-center space-x-2"></div>
+            {(selectedDifficulty !== "Tất cả" ||
+              selectedTopic !== "Tất cả") && (
+              <button
+                onClick={() => {
+                  setSelectedDifficulty("Tất cả");
+                  setSelectedTopic("Tất cả");
+                  setCurrentPage(1);
+                }}
+                className="flex items-center rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm text-gray-600 shadow-sm transition-all hover:bg-gray-50"
+              >
+                <X className="mr-2 h-4 w-4" />
+                Xóa bộ lọc
+              </button>
+            )}
           </div>
 
-          {/* Bảng danh sách câu hỏi */}
           <div className="mb-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg transition-all duration-300 hover:shadow-xl">
             <div className="border-b p-6">
               <h2 className="text-lg font-semibold text-gray-800">
@@ -545,97 +682,289 @@ const ManageQuestions = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredQuestions.length > 0 ? (
-                    filteredQuestions.map((question, index) => (
-                      <tr
-                        key={question.id}
-                        className="border-b border-gray-100 transition-colors hover:bg-blue-50/30"
-                        style={{
-                          animationDelay: `${index * 100}ms`,
-                          animation: "fadeIn 0.5s ease-in-out forwards",
-                        }}
-                      >
-                        <td className="px-6 py-4 text-gray-800">
-                          {question.id}
-                        </td>
-                        <td className="px-6 py-4 font-medium text-gray-800">
-                          {question.content.length > 50
-                            ? `${question.content.substring(0, 50)}...`
-                            : question.content}
-                        </td>
-                        <td className="px-6 py-4 text-gray-800">
-                          {question.topic}
-                        </td>
-                        <td className="px-6 py-4">
-                          <span
-                            className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                              question.difficulty === "Dễ"
-                                ? "bg-green-100 text-green-800"
-                                : question.difficulty === "Trung bình"
-                                ? "bg-blue-100 text-blue-800"
-                                : question.difficulty === "Khó"
-                                ? "bg-orange-100 text-orange-800"
-                                : "bg-red-100 text-red-800"
-                            }`}
-                          >
-                            {question.difficulty}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-gray-800">
-                          <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
-                            {question.options.find((opt) => opt.isCorrect)
-                              ?.id || "N/A"}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              onClick={() => handleEditQuestion(question.id)}
-                              className="flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 transition-all duration-300 hover:bg-blue-100 hover:scale-105"
+                  {questions.length > 0 ? (
+                    questions.map((question, index) => {
+                      const topic =
+                        typeof question.topic === "object" &&
+                        question.topic !== null
+                          ? question.topic.name
+                          : question.topic;
+                      const difficulty =
+                        typeof question.difficulty === "object" &&
+                        question.difficulty !== null
+                          ? difficultyMap[question.difficulty.name] ||
+                            question.difficulty.name
+                          : difficultyMap[question.difficulty] ||
+                            question.difficulty;
+                      const content =
+                        typeof question.content === "string"
+                          ? question.content
+                          : question.content?.name || "";
+                      return (
+                        <tr
+                          key={question.id || question._id || index}
+                          className="border-b border-gray-100 transition-colors hover:bg-blue-50/30"
+                        >
+                          <td className="px-6 py-4 text-gray-800">
+                            {question.id ||
+                              question._id ||
+                              index + 1 + (currentPage - 1) * PAGE_SIZE}
+                          </td>
+                          <td className="px-6 py-4 font-medium text-gray-800">
+                            {content.length > 50
+                              ? `${content.substring(0, 50)}...`
+                              : content}
+                          </td>
+                          <td className="px-6 py-4 text-gray-800">{topic}</td>
+                          <td className="px-6 py-4">
+                            <span
+                              className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
+                                difficulty === "Dễ"
+                                  ? "bg-green-100 text-green-800"
+                                  : difficulty === "Trung bình"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : difficulty === "Khó"
+                                  ? "bg-orange-100 text-orange-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
                             >
-                              <Edit className="mr-1.5 h-4 w-4" />
-                              Sửa
-                            </button>
-                            <button
-                              onClick={() => confirmDeleteQuestion(question.id)}
-                              className="flex items-center rounded-lg bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-all duration-300 hover:bg-red-100 hover:scale-105"
-                            >
-                              <Trash2 className="mr-1.5 h-4 w-4" />
-                              Xóa
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                              {difficulty}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-gray-800">
+                            <span className="inline-flex rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-800">
+                              {(() => {
+                                if (
+                                  question.correctAnswer &&
+                                  Array.isArray(question.options)
+                                ) {
+                                  const correct = question.options.find(
+                                    (opt) =>
+                                      opt.label === question.correctAnswer
+                                  );
+                                  return correct
+                                    ? `${correct.label}: ${correct.text}`
+                                    : "N/A";
+                                }
+                                return "N/A";
+                              })()}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() =>
+                                  handleEditQuestion(
+                                    question.id || question._id || index
+                                  )
+                                }
+                                className="flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 transition-all duration-300 hover:bg-blue-100 hover:scale-105"
+                              >
+                                <Edit className="mr-1.5 h-4 w-4" />
+                                Sửa
+                              </button>
+                              <button
+                                onClick={() =>
+                                  confirmDeleteQuestion(
+                                    question.id || question._id || index
+                                  )
+                                }
+                                className="flex items-center rounded-lg bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-all duration-300 hover:bg-red-100 hover:scale-105"
+                              >
+                                <Trash2 className="mr-1.5 h-4 w-4" />
+                                Xóa
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   ) : (
                     <tr>
                       <td
                         colSpan={6}
                         className="px-6 py-8 text-center text-gray-500"
                       >
-                        Không tìm thấy câu hỏi nào phù hợp với tìm kiếm
+                        Không tìm thấy câu hỏi nào phù hợp
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
+            {totalPages > 1 && (
+              <div className="flex flex-wrap items-center justify-center gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
+                <button
+                  className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(1)}
+                  title="Trang đầu"
+                >
+                  <span className="sr-only">Trang đầu</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="lucide lucide-chevrons-left"
+                  >
+                    <path d="m11 17-5-5 5-5" />
+                    <path d="m18 17-5-5 5-5" />
+                  </svg>
+                </button>
+                <button
+                  className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  title="Trang trước"
+                >
+                  <span className="sr-only">Trang trước</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="lucide lucide-chevron-left"
+                  >
+                    <path d="m15 18-6-6 6-6" />
+                  </svg>
+                </button>
+
+                {start > 1 && (
+                  <>
+                    <button
+                      className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50"
+                      onClick={() => setCurrentPage(1)}
+                    >
+                      1
+                    </button>
+                    {start > 2 && (
+                      <span className="flex items-center justify-center px-1 text-gray-500">
+                        ...
+                      </span>
+                    )}
+                  </>
+                )}
+
+                {pages.map((page) => (
+                  <button
+                    key={page}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-all ${
+                      currentPage === page
+                        ? "border-blue-500 bg-blue-500 text-white hover:bg-blue-600"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setCurrentPage(page)}
+                  >
+                    {page}
+                  </button>
+                ))}
+
+                {end < totalPages && (
+                  <>
+                    {end < totalPages - 1 && (
+                      <span className="flex items-center justify-center px-1 text-gray-500">
+                        ...
+                      </span>
+                    )}
+                    <button
+                      className="rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-50"
+                      onClick={() => setCurrentPage(totalPages)}
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+
+                <button
+                  className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={currentPage === totalPages}
+                  onClick={() =>
+                    setCurrentPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  title="Trang sau"
+                >
+                  <span className="sr-only">Trang sau</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="lucide lucide-chevron-right"
+                  >
+                    <path d="m9 18 6-6 6-6" />
+                  </svg>
+                </button>
+                <button
+                  className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(totalPages)}
+                  title="Trang cuối"
+                >
+                  <span className="sr-only">Trang cuối</span>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="lucide lucide-chevrons-right"
+                  >
+                    <path d="m13 17 5-5-5-5" />
+                    <path d="m6 17 5-5-5-5" />
+                  </svg>
+                </button>
+
+                <div className="ml-2 flex items-center text-sm text-gray-500">
+                  <span>
+                    Trang {currentPage} / {totalPages}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Thống kê */}
           <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
             <div className="transform rounded-xl border border-gray-100 bg-white p-6 shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl hover:bg-blue-50/30">
               <h3 className="mb-4 text-lg font-semibold text-gray-800">
                 Thống kê theo mức độ
               </h3>
               <div className="space-y-4">
-                {difficultyLevels
+                {difficulties
                   .filter((d) => d !== "Tất cả")
                   .map((level) => {
-                    const count = questions.filter(
-                      (q) => q.difficulty === level
-                    ).length;
-                    const percentage = (count / questions.length) * 100;
+                    const count = questions.filter((q) => {
+                      const diff =
+                        typeof q.difficulty === "object" &&
+                        q.difficulty !== null
+                          ? difficultyMap[q.difficulty.name] ||
+                            q.difficulty.name
+                          : difficultyMap[q.difficulty] || q.difficulty;
+                      return diff === level;
+                    }).length;
+                    const percentage =
+                      questions.length > 0
+                        ? (count / questions.length) * 100
+                        : 0;
                     return (
                       <div
                         key={level}
@@ -652,10 +981,7 @@ const ManageQuestions = () => {
                         <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
                           <div
                             className="h-2.5 rounded-full bg-blue-600 transition-all duration-1000"
-                            style={{
-                              width: `${percentage}%`,
-                              animation: "growWidth 1.5s ease-out forwards",
-                            }}
+                            style={{ width: `${percentage}%` }}
                           ></div>
                         </div>
                       </div>
@@ -669,12 +995,16 @@ const ManageQuestions = () => {
                 Thống kê theo chủ đề
               </h3>
               <div className="max-h-64 space-y-4 overflow-y-auto">
-                {itTopics
+                {topics
                   .filter((t) => t !== "Tất cả")
                   .map((topic) => {
-                    const count = questions.filter(
-                      (q) => q.topic === topic
-                    ).length;
+                    const count = questions.filter((q) => {
+                      const t =
+                        typeof q.topic === "object" && q.topic !== null
+                          ? q.topic.name
+                          : q.topic;
+                      return t === topic;
+                    }).length;
                     const percentage =
                       questions.length > 0
                         ? (count / questions.length) * 100
@@ -695,10 +1025,7 @@ const ManageQuestions = () => {
                         <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
                           <div
                             className="h-2.5 rounded-full bg-green-600 transition-all duration-1000"
-                            style={{
-                              width: `${percentage}%`,
-                              animation: "growWidth 1.5s ease-out forwards",
-                            }}
+                            style={{ width: `${percentage}%` }}
                           ></div>
                         </div>
                       </div>
@@ -730,7 +1057,7 @@ const ManageQuestions = () => {
                   <div>
                     <p className="text-sm text-gray-500">Số chủ đề</p>
                     <p className="text-3xl font-bold text-gray-800">
-                      {new Set(questions.map((q) => q.topic)).size}
+                      {topics.length - 1}
                     </p>
                   </div>
                 </div>
@@ -757,7 +1084,6 @@ const ManageQuestions = () => {
         </footer>
       </div>
 
-      {/* Form thêm/sửa câu hỏi */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm transition-all duration-300">
           <div className="m-4 max-h-[90vh] w-full max-w-3xl transform overflow-y-auto rounded-2xl bg-white p-8 shadow-xl transition-transform duration-300 animate-fade-in">
@@ -799,7 +1125,7 @@ const ManageQuestions = () => {
                     className="w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                     required
                   >
-                    {itTopics
+                    {topics
                       .filter((t) => t !== "Tất cả")
                       .map((topic) => (
                         <option key={topic} value={topic}>
@@ -819,7 +1145,7 @@ const ManageQuestions = () => {
                     className="w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                     required
                   >
-                    {difficultyLevels
+                    {difficulties
                       .filter((d) => d !== "Tất cả")
                       .map((level) => (
                         <option key={level} value={level}>
@@ -904,7 +1230,6 @@ const ManageQuestions = () => {
         </div>
       )}
 
-      {/* AI Helper Modal */}
       {showAIHelper && (
         <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="m-4 w-full max-w-2xl animate-fade-in rounded-xl bg-white p-6 shadow-2xl">
@@ -958,7 +1283,6 @@ const ManageQuestions = () => {
         </div>
       )}
 
-      {/* Confirm Delete Modal */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
           <div className="m-4 w-full max-w-md animate-fade-in rounded-xl bg-white p-6 shadow-2xl">
@@ -992,7 +1316,6 @@ const ManageQuestions = () => {
         </div>
       )}
 
-      {/* Notification */}
       {showNotification && (
         <div
           className={`fixed bottom-4 right-4 z-50 flex items-center rounded-lg p-4 shadow-lg transition-all duration-300 ${
@@ -1009,30 +1332,6 @@ const ManageQuestions = () => {
           <p className="text-white">{notificationMessage}</p>
         </div>
       )}
-
-      {/* Global CSS for animations */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes growWidth {
-          from {
-            width: 0;
-          }
-        }
-
-        .animate-fade-in {
-          animation: fadeIn 0.3s ease-out forwards;
-        }
-      `}</style>
     </div>
   );
 };
