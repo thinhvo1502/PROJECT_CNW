@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bar,
   LineChart,
@@ -27,10 +27,17 @@ import {
   Filter,
 } from "lucide-react";
 import React from "react";
+import {
+  getOverall,
+  getTopicAnalytics,
+  type TopicAnalytics,
+} from "../services/statisticalService";
+
 interface TopicScore {
   topic: string;
   score: number;
   fullMark: number;
+  totalAttempts: number;
 }
 interface ProgressData {
   name: string;
@@ -59,15 +66,56 @@ const StatisticsPage = () => {
     "week" | "month"
   >("week");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  // Dữ liệu mẫu cho biểu đồ radar
-  const radarData: TopicScore[] = [
-    { topic: "Mạng máy tính", score: 85, fullMark: 100 },
-    { topic: "Cấu trúc dữ liệu", score: 78, fullMark: 100 },
-    { topic: "Lập trình hướng đối tượng", score: 92, fullMark: 100 },
-    { topic: "Cơ sở dữ liệu", score: 70, fullMark: 100 },
-    { topic: "An toàn thông tin", score: 65, fullMark: 100 },
-    { topic: "Hệ điều hành", score: 80, fullMark: 100 },
-  ];
+  const [statsSummary, setStatsSummary] = useState<StatsSummary>({
+    totalQuizzes: 0,
+    averageScore: 0,
+    highestScore: 0,
+    lowestScore: 0,
+    completedTopics: 0,
+    totalTopics: 0,
+  });
+  const [topicData, setTopicData] = useState<TopicScore[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [overallResponse, topicResponse] = await Promise.all([
+          getOverall(),
+          getTopicAnalytics(),
+        ]);
+
+        if (overallResponse.success) {
+          const data = overallResponse.data;
+          setStatsSummary({
+            totalQuizzes: data.totalAttempts,
+            averageScore: data.averageScore,
+            highestScore: data.bestScore,
+            lowestScore: data.countBelow50 > 0 ? 50 : 0,
+            completedTopics: data.topicStats.learned,
+            totalTopics: data.topicStats.total,
+          });
+        }
+
+        if (topicResponse.success) {
+          const radarData = topicResponse.data.map((topic) => ({
+            topic: topic.name,
+            score: topic.accuracy || 0,
+            fullMark: 100,
+            totalAttempts: topic.totalAttempts,
+          }));
+          setTopicData(radarData);
+        }
+      } catch (error) {
+        console.error("Error fetching statistics:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   // Dữ liệu mẫu cho biểu đồ tiến độ theo tuần
   const weeklyProgressData: ProgressData[] = [
@@ -152,15 +200,6 @@ const StatisticsPage = () => {
     },
   ];
 
-  // Dữ liệu thống kê tổng quan
-  const statsSummary: StatsSummary = {
-    totalQuizzes: 25,
-    averageScore: 79.5,
-    highestScore: 95,
-    lowestScore: 60,
-    completedTopics: 6,
-    totalTopics: 8,
-  };
   // lọc dữ liệu điểm số theo thời gian dựa trên bộ lọc
   const getFilteredScoreData = () => {
     return scoreOverTimeData;
@@ -333,34 +372,58 @@ const StatisticsPage = () => {
         {/* Biểu đồ radar điểm số theo chủ đề */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-xl font-semibold mb-6">Điểm số theo chủ đề</h2>
-          <div className="h-96">
-            <ResponsiveContainer width="100%">
-              <RadarChart cx="50%" cy="50%" outerRadius="80%" data={radarData}>
-                <PolarGrid />
-                <PolarAngleAxis
-                  dataKey="topic"
-                  tick={{ fill: "#4b563", fontSize: 12 }}
-                />
-                <PolarRadiusAxis angle={30} domain={[0, 100]} />
-                <Radar
-                  name="Điểm số"
-                  dataKey="score"
-                  stroke="#3B82F6"
-                  fill="#3B82F6"
-                  fillOpacity={0.6}
-                />
-                <Radar
-                  name="Điểm tối đa"
-                  dataKey="fullMark"
-                  stroke="#9CA3AF"
-                  fill="#9CA3AF"
-                  fillOpacity={0.1}
-                />
-                <Legend />
-                <Tooltip />
-              </RadarChart>
-            </ResponsiveContainer>
-          </div>
+          {loading ? (
+            <div className="flex justify-center items-center h-96">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+            </div>
+          ) : topicData.length > 0 ? (
+            <div className="h-96">
+              <ResponsiveContainer width="100%">
+                <RadarChart
+                  cx="50%"
+                  cy="50%"
+                  outerRadius="80%"
+                  data={topicData}
+                >
+                  <PolarGrid />
+                  <PolarAngleAxis
+                    dataKey="topic"
+                    tick={{ fill: "#4b563", fontSize: 12 }}
+                  />
+                  <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                  <Radar
+                    name="Độ chính xác"
+                    dataKey="score"
+                    stroke="#3B82F6"
+                    fill="#3B82F6"
+                    fillOpacity={0.6}
+                  />
+                  <Radar
+                    name="Điểm tối đa"
+                    dataKey="fullMark"
+                    stroke="#9CA3AF"
+                    fill="#9CA3AF"
+                    fillOpacity={0.1}
+                  />
+                  <Legend />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === "Độ chính xác") {
+                        return [`${value}%`, name];
+                      }
+                      return [value, name];
+                    }}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="flex justify-center items-center h-96">
+              <p className="text-gray-500">
+                Chưa có dữ liệu thống kê theo chủ đề
+              </p>
+            </div>
+          )}
         </div>
         {/* Biểu đồ tiến độ học tập */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">

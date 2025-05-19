@@ -10,6 +10,14 @@ export interface User {
   role: "student" | "admin";
   isActive: boolean;
   purchasedExams: string[];
+  learningStats: {
+    totalAttempts: number;
+    averageScore: number;
+    topicStats: {
+      learned: number;
+      total: number;
+    };
+  };
 }
 
 // Định nghĩa kiểu dữ liệu cho cập nhật User
@@ -50,13 +58,42 @@ export const uploadProfileImage = async (
   file: File
 ): Promise<{ url: string }> => {
   const formData = new FormData();
-  formData.append("image", file);
-
-  const response = await api.post("/upload/profile-image", formData, {
+  formData.append("profileImage", file);
+  const response = await api.put("/auth/profile", formData, {
     headers: {
       "Content-Type": "multipart/form-data",
     },
   });
 
   return response.data;
+};
+// Cập nhật profile với ảnh đại diện
+export const updateProfileWithImage = async (
+  userData: UpdateUserData,
+  file?: File
+): Promise<User> => {
+  const formData = new FormData();
+
+  // Thêm các trường dữ liệu vào formData
+  if (userData.name) formData.append("name", userData.name);
+  if (userData.email) formData.append("email", userData.email);
+  if (userData.class) formData.append("class", userData.class);
+
+  // Thêm file ảnh nếu có
+  if (file) {
+    formData.append("profileImage", file);
+  }
+  console.log("formData: ", formData);
+  try {
+    const response = await api.put("/auth/profile", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    console.log("response service: ", response.data.user);
+    return response.data.user;
+  } catch (error) {
+    console.error("Error in updateProfileWithImage:", error);
+    throw error;
+  }
 };

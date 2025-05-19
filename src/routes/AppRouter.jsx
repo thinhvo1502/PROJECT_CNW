@@ -58,7 +58,7 @@ export default function AppRouter() {
       />
 
       <Route path="/quiz-result/:attemptId" element={<ResultPage />} />
-      <Route path="/result-detail/:id" element={<ResultDetailPage />} />
+      <Route path="/result-detail/:attemptId" element={<ResultDetailPage />} />
       <Route
         path="/history"
         element={

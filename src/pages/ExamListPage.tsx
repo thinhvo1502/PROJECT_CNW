@@ -22,7 +22,7 @@ import {
   getDifficultyColor,
   isPremiumExam,
 } from "../services/examService";
-
+import React from "react";
 const QuizSelection = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -89,6 +89,7 @@ const QuizSelection = () => {
 
         const result = await getExams(filters);
         setExams(result.exams);
+        console.log("hi", exams);
         setFilteredExams(result.exams);
         setTotalPages(result.pagination.pages);
         setTotalExams(result.pagination.total);
@@ -131,20 +132,21 @@ const QuizSelection = () => {
 
   // Lấy danh sách tất cả các chủ đề từ exams
   const getAllTopics = () => {
-    const topicsSet = new Set<string>();
     const topicsMap = new Map<string, { _id: string; name: string }>();
 
     exams.forEach((exam) => {
-      if (Array.isArray(exam.topics)) {
-        exam.topics.forEach((topic) => {
-          if (typeof topic !== "string") {
-            topicsSet.add(topic.name);
-            topicsMap.set(topic._id, topic);
-          }
-        });
+      if (
+        exam.topic &&
+        typeof exam.topic === "object" &&
+        "_id" in exam.topic &&
+        "name" in exam.topic
+      ) {
+        topicsMap.set(
+          exam.topic._id,
+          exam.topic as { _id: string; name: string }
+        );
       }
     });
-
     return Array.from(topicsMap.values());
   };
 
@@ -357,10 +359,10 @@ const QuizSelection = () => {
                         <div className="flex justify-between items-center mt-2">
                           <span
                             className={`text-xs font-medium px-2 py-1 rounded-full ${getDifficultyColor(
-                              "medium" // Giả sử độ khó mặc định là trung bình
+                              `${exam.difficulty}` // Giả sử độ khó mặc định là trung bình
                             )}`}
                           >
-                            {getDifficultyInVietnamese("medium")}
+                            {getDifficultyInVietnamese(`${exam.difficulty}`)}
                           </span>
                         </div>
                       </div>
@@ -373,18 +375,13 @@ const QuizSelection = () => {
 
                       <div className="space-y-3 mb-6">
                         {/* Chủ đề */}
-                        {Array.isArray(exam.topics) &&
-                          exam.topics.length > 0 && (
+                        {exam.topic &&
+                          typeof exam.topic === "object" &&
+                          "name" in exam.topic && (
                             <div className="flex items-center text-gray-600">
                               <BookMarked className="h-4 w-4 mr-2" />
                               <span>
-                                {exam.topics
-                                  .map((topic) =>
-                                    typeof topic === "string"
-                                      ? topic
-                                      : topic.name
-                                  )
-                                  .join(", ")}
+                                {(exam.topic as { name: string }).name}
                               </span>
                             </div>
                           )}

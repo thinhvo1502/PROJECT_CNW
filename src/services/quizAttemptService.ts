@@ -159,6 +159,7 @@ const quizAttemptService = {
         questionId,
         answer,
       });
+      console.log("nộp nè", response.data.data);
       return response.data.data;
     } catch (error) {
       console.error("Error submitting answer:", error);
@@ -170,6 +171,7 @@ const quizAttemptService = {
   async completeQuiz(attemptId: string): Promise<CompleteQuizResponse> {
     try {
       const response = await api.post(`/quiz-attempts/${attemptId}/complete`);
+      console.log("Complete quiz response:", response.data);
       return response.data.data;
     } catch (error) {
       console.error("Error completing quiz:", error);
@@ -180,7 +182,9 @@ const quizAttemptService = {
   // Lấy kết quả chi tiết
   async getQuizResult(attemptId: string): Promise<QuizResult> {
     try {
+      console.log("yaa", attemptId);
       const response = await api.get(`/quiz-attempts/${attemptId}/summary`);
+      console.log("yaa", response.data.data);
       return response.data.data;
     } catch (error) {
       console.error("Error getting quiz result:", error);

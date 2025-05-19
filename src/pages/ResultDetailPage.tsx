@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,272 +10,279 @@ import {
   AlertCircle,
   ArrowLeft,
   BookOpen,
+  Clock,
+  RefreshCw,
 } from "lucide-react";
 
 // Thêm đoạn mã này vào phần đầu file để import PremiumBadge
 import PremiumBadge from "../components/PremiumBadge";
 import React from "react";
-// Định nghĩa kiểu dữ liệu cho câu hỏi
-interface Question {
-  id: number;
-  content: string;
-  options: string[];
-  correctAnswer: number; // 0-3 tương ứng với A-D
-  explanation?: string;
-  topic: string;
+import api from "../utils/api";
+
+interface Option {
+  label: string;
+  text: string;
+  _id: string;
 }
 
-// Định nghĩa kiểu dữ liệu cho kết quả chi tiết
+interface Question {
+  questionId: string;
+  order: number;
+  points: number;
+  content: string;
+  options: Option[];
+  difficulty: string | null;
+  userAnswer: string | null;
+  correctAnswer: string | null;
+  correctAnswerText: string | null;
+  explanation: string | null;
+  isCorrect: boolean;
+  answered: boolean;
+  status: "correct" | "incorrect" | "not_answered" | "not_found";
+  hasPrev: boolean;
+  hasNext: boolean;
+  prevOrder: number | null;
+  nextOrder: number | null;
+}
+
 interface QuizDetailResult {
-  quizId: string | number;
-  quizName: string;
-  userAnswers: (number | null)[];
-  questions: Question[];
+  _id: string;
+  user: string;
+  exam: {
+    _id: string;
+    title: string;
+    description: string;
+    timeLimit: number;
+    totalPoints: number;
+  };
+  score: number;
+  startTime: string;
+  endTime: string;
+  timeSpent: number;
+  correctAnswers: number;
+  wrongAnswers: number;
+  skippedQuestions: number;
+  status: string;
+  autoCompleted: boolean;
+  completed: boolean;
+  reviewed: boolean;
+  resultSummary: {
+    totalPoints: number;
+    earnedPoints: number;
+    correctCount: number;
+    incorrectCount: number;
+    skippedCount: number;
+  };
+  questionsWithAnswers: Question[];
+  questionStatus: Array<{
+    order: number;
+    questionId: string;
+    answered: boolean;
+    userAnswer: string | null;
+  }>;
+  totalQuestions: number;
+  answeredCount: number;
 }
 
 const QuizResultDetail = () => {
-  const { id } = useParams();
-  const quizId = id || "unknown";
-
-  // State cho câu hỏi hiện tại
+  const { attemptId } = useParams();
+  const navigate = useNavigate();
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-
-  // State cho việc hiển thị/ẩn giải thích
   const [showExplanations, setShowExplanations] = useState<boolean[]>([]);
+  const [isPremiumUser] = useState(false);
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [resultData, setResultData] = useState<QuizDetailResult | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Trong thực tế, dữ liệu này sẽ được lấy từ API hoặc từ state của ứng dụng
-  // Ở đây tôi sử dụng dữ liệu mẫu
-  const [resultData, setResultData] = useState<QuizDetailResult>({
-    quizId,
-    quizName: "Kiến thức cơ bản về mạng LAN",
-    userAnswers: [0, 2, 2, 1, 2, 1, 0, 2, 3, 0],
-    questions: [
-      {
-        id: 1,
-        content: "Mạng LAN là viết tắt của thuật ngữ nào?",
-        options: [
-          "Local Area Network",
-          "Large Area Network",
-          "Long Access Network",
-          "Limited Area Network",
-        ],
-        correctAnswer: 0,
-        explanation:
-          "LAN là viết tắt của Local Area Network (Mạng cục bộ). Đây là một mạng máy tính được giới hạn trong một khu vực nhỏ như văn phòng, trường học hoặc nhà ở.",
-        topic: "Mạng LAN",
-      },
-      {
-        id: 2,
-        content:
-          "Thiết bị nào sau đây được sử dụng để kết nối các máy tính trong mạng LAN?",
-        options: ["Modem", "Router", "Switch", "Tất cả các phương án trên"],
-        correctAnswer: 2,
-        explanation:
-          "Switch là thiết bị chính được sử dụng để kết nối các máy tính trong mạng LAN. Switch hoạt động ở tầng Data Link (tầng 2) trong mô hình OSI và chuyển tiếp dữ liệu dựa trên địa chỉ MAC.",
-        topic: "Mạng LAN",
-      },
-      {
-        id: 3,
-        content:
-          "Giao thức nào được sử dụng phổ biến nhất cho truyền thông tin trên Internet?",
-        options: ["HTTP", "FTP", "TCP/IP", "SMTP"],
-        correctAnswer: 2,
-        explanation:
-          "TCP/IP (Transmission Control Protocol/Internet Protocol) là bộ giao thức cơ bản được sử dụng cho truyền thông trên Internet. Nó cung cấp khả năng kết nối end-to-end và xác định cách dữ liệu được định dạng, địa chỉ hóa, truyền tải, định tuyến và nhận tại điểm đến.",
-        topic: "Giao thức mạng",
-      },
-      {
-        id: 4,
-        content: "Địa chỉ IP phiên bản 4 (IPv4) có độ dài bao nhiêu bit?",
-        options: ["16 bit", "32 bit", "64 bit", "128 bit"],
-        correctAnswer: 1,
-        explanation:
-          "Địa chỉ IPv4 có độ dài 32 bit, thường được biểu diễn dưới dạng bốn số thập phân từ 0 đến 255, phân tách bởi dấu chấm (ví dụ: 192.168.1.1).",
-        topic: "Địa chỉ IP",
-      },
-      {
-        id: 5,
-        content: "Mô hình OSI có bao nhiêu tầng?",
-        options: ["5 tầng", "6 tầng", "7 tầng", "8 tầng"],
-        correctAnswer: 2,
-        explanation:
-          "Mô hình OSI (Open Systems Interconnection) có 7 tầng: Physical, Data Link, Network, Transport, Session, Presentation và Application.",
-        topic: "Mô hình OSI",
-      },
-      {
-        id: 6,
-        content:
-          "Tầng nào trong mô hình OSI chịu trách nhiệm mã hóa và giải mã dữ liệu?",
-        options: [
-          "Tầng vật lý (Physical)",
-          "Tầng ứng dụng (Application)",
-          "Tầng trình diễn (Presentation)",
-          "Tầng phiên (Session)",
-        ],
-        correctAnswer: 2,
-        explanation:
-          "Tầng trình diễn (Presentation) trong mô hình OSI chịu trách nhiệm mã hóa và giải mã dữ liệu, cũng như chuyển đổi dữ liệu giữa các định dạng khác nhau để đảm bảo các hệ thống khác nhau có thể hiểu được dữ liệu.",
-        topic: "Mô hình OSI",
-      },
-      {
-        id: 7,
-        content:
-          "Giao thức nào được sử dụng để phân giải tên miền thành địa chỉ IP?",
-        options: ["DHCP", "DNS", "HTTP", "FTP"],
-        correctAnswer: 1,
-        explanation:
-          "DNS (Domain Name System) là giao thức được sử dụng để phân giải tên miền (ví dụ: www.example.com) thành địa chỉ IP tương ứng để máy tính có thể kết nối đến server đúng.",
-        topic: "Giao thức mạng",
-      },
-      {
-        id: 8,
-        content: "Subnet mask nào sau đây tương ứng với địa chỉ IP lớp C?",
-        options: [
-          "255.0.0.0",
-          "255.255.0.0",
-          "255.255.255.0",
-          "255.255.255.255",
-        ],
-        correctAnswer: 2,
-        explanation:
-          "Subnet mask 255.255.255.0 tương ứng với địa chỉ IP lớp C. Địa chỉ IP lớp C có 24 bit đầu dành cho phần network và 8 bit cuối dành cho phần host.",
-        topic: "Địa chỉ IP",
-      },
-      {
-        id: 9,
-        content: "Cổng (port) nào thường được sử dụng cho giao thức HTTP?",
-        options: ["Port 21", "Port 25", "Port 80", "Port 443"],
-        correctAnswer: 2,
-        explanation:
-          "Port 80 là cổng mặc định được sử dụng cho giao thức HTTP (Hypertext Transfer Protocol). Port 443 được sử dụng cho HTTPS, Port 21 cho FTP và Port 25 cho SMTP.",
-        topic: "Giao thức mạng",
-      },
-      {
-        id: 10,
-        content:
-          "Công nghệ nào cho phép nhiều mạng LAN ảo hoạt động trên cùng một hạ tầng vật lý?",
-        options: ["NAT", "VLAN", "VPN", "MPLS"],
-        correctAnswer: 1,
-        explanation:
-          "VLAN (Virtual Local Area Network) là công nghệ cho phép tạo nhiều mạng LAN ảo trên cùng một hạ tầng vật lý. VLAN giúp phân đoạn mạng một cách logic, cải thiện hiệu suất và bảo mật.",
-        topic: "Mạng LAN",
-      },
-    ],
-  });
-
-  // Khởi tạo trạng thái hiển thị giải thích
   useEffect(() => {
-    setShowExplanations(new Array(resultData.questions.length).fill(false));
-  }, [resultData.questions.length]);
+    const fetchResult = async () => {
+      try {
+        const response = await api.get(`/quiz-attempts/${attemptId}/result`);
+        const data = response.data;
+        if (data.success) {
+          setResultData(data.data);
+          setShowExplanations(
+            new Array(data.data.questionsWithAnswers.length).fill(false)
+          );
+        } else {
+          setError(data.message || "Failed to fetch result");
+        }
+      } catch (err) {
+        setError("Error fetching result");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Xử lý chuyển câu hỏi
+    fetchResult();
+  }, [attemptId]);
+
   const goToQuestion = (index: number) => {
-    if (index >= 0 && index < resultData.questions.length) {
+    if (
+      resultData &&
+      index >= 0 &&
+      index < resultData.questionsWithAnswers.length
+    ) {
       setCurrentQuestionIndex(index);
-      // Cuộn lên đầu trang khi chuyển câu hỏi
       window.scrollTo(0, 0);
     }
   };
 
-  // Xử lý hiển thị/ẩn giải thích
   const toggleExplanation = (index: number) => {
+    if (!isPremiumUser) {
+      setShowPremiumModal(true);
+      return;
+    }
     const newShowExplanations = [...showExplanations];
     newShowExplanations[index] = !newShowExplanations[index];
     setShowExplanations(newShowExplanations);
   };
 
-  // Lấy câu hỏi hiện tại
-  const currentQuestion = resultData.questions[currentQuestionIndex];
-  const userAnswer = resultData.userAnswers[currentQuestionIndex];
-  const isCorrect = userAnswer === currentQuestion.correctAnswer;
+  const handleRetakeQuiz = async () => {
+    try {
+      const response = await api.post(
+        `/quiz-attempts/retake/${resultData?.exam._id}`
+      );
+      if (response.data.success) {
+        // Navigate to the new quiz attempt
+        navigate(`/quiz/${response.data.data._id}`);
+      }
+    } catch (error) {
+      console.error("Error retaking quiz:", error);
+      // You might want to show an error message to the user here
+    }
+  };
 
-  // Thêm vào state giả định trạng thái người dùng
-  const isPremiumUser = false; // Trong thực tế, sẽ lấy từ state hoặc context
-  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
+
+  if (error || !resultData) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+          <strong className="font-bold">Error! </strong>
+          <span className="block sm:inline">
+            {error || "Failed to load result"}
+          </span>
+        </div>
+        <Link
+          to="/quiz-history"
+          className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+        >
+          Back to Quiz History
+        </Link>
+      </div>
+    );
+  }
+
+  const currentQuestion = resultData.questionsWithAnswers[currentQuestionIndex];
+  const userAnswer = currentQuestion.userAnswer;
+  const isCorrect = currentQuestion.isCorrect;
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            to={`/quiz/${quizId}/result`}
-            className="flex items-center text-blue-600 hover:text-blue-800 mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Quay lại kết quả tổng quan
-          </Link>
-          <h1 className="text-2xl font-bold mb-2">
-            Chi tiết bài làm: {resultData.quizName}
-          </h1>
-          <div className="flex items-center text-gray-600">
-            <BookOpen className="h-4 w-4 mr-1" />
-            <span>
-              Câu hỏi {currentQuestionIndex + 1} / {resultData.questions.length}
-            </span>
+          <div className="flex justify-between items-center mb-4">
+            <Link
+              to={`/quiz-result/${attemptId}`}
+              className="flex items-center text-blue-600 hover:text-blue-800"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Overview
+            </Link>
+            <button
+              onClick={handleRetakeQuiz}
+              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Retake Quiz
+            </button>
+          </div>
+          <h1 className="text-2xl font-bold mb-2">{resultData.exam.title}</h1>
+          <div className="flex items-center text-gray-600 space-x-4">
+            <div className="flex items-center">
+              <BookOpen className="h-4 w-4 mr-1" />
+              <span>
+                Question {currentQuestionIndex + 1} /{" "}
+                {resultData.totalQuestions}
+              </span>
+            </div>
+            <div className="flex items-center">
+              <Clock className="h-4 w-4 mr-1" />
+              <span>Time spent: {resultData.timeSpent} seconds</span>
+            </div>
           </div>
         </div>
 
-        {/* Điều hướng câu hỏi */}
+        {/* Question Navigation */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="flex flex-wrap gap-2 mb-4">
-            {resultData.questions.map((question, index) => {
-              const answer = resultData.userAnswers[index];
-              const correct = answer === question.correctAnswer;
-
-              return (
-                <button
-                  key={question.id}
-                  onClick={() => goToQuestion(index)}
-                  className={`w-10 h-10 rounded-md flex items-center justify-center font-medium transition-colors
-                    ${
-                      currentQuestionIndex === index
-                        ? "ring-2 ring-blue-500 ring-offset-2"
-                        : ""
-                    }
-                    ${
-                      correct
-                        ? "bg-green-100 text-green-800 border border-green-300"
-                        : answer !== null
-                        ? "bg-red-100 text-red-800 border border-red-300"
-                        : "bg-gray-100 text-gray-800 hover:bg-gray-200"
-                    }`}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
+            {resultData.questionsWithAnswers.map((question, index) => (
+              <button
+                key={question.questionId}
+                onClick={() => goToQuestion(index)}
+                className={`w-10 h-10 rounded-md flex items-center justify-center font-medium transition-colors
+                  ${
+                    currentQuestionIndex === index
+                      ? "ring-2 ring-blue-500 ring-offset-2"
+                      : ""
+                  }
+                  ${
+                    question.status === "correct"
+                      ? "bg-green-100 text-green-800 border border-green-300"
+                      : question.status === "incorrect"
+                      ? "bg-red-100 text-red-800 border border-red-300"
+                      : question.status === "not_answered"
+                      ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                      : "bg-gray-100 text-gray-800 hover:bg-gray-200"
+                  }`}
+              >
+                {index + 1}
+              </button>
+            ))}
           </div>
 
           <div className="flex items-center text-sm text-gray-600 mb-2">
             <div className="flex items-center mr-4">
               <div className="w-4 h-4 bg-green-100 border border-green-300 rounded-sm mr-1"></div>
-              <span>Đúng</span>
+              <span>Correct</span>
             </div>
             <div className="flex items-center mr-4">
               <div className="w-4 h-4 bg-red-100 border border-red-300 rounded-sm mr-1"></div>
-              <span>Sai</span>
+              <span>Incorrect</span>
+            </div>
+            <div className="flex items-center mr-4">
+              <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded-sm mr-1"></div>
+              <span>Not Answered</span>
             </div>
             <div className="flex items-center">
               <div className="w-4 h-4 bg-gray-100 border border-gray-300 rounded-sm mr-1"></div>
-              <span>Chưa trả lời</span>
+              <span>Not Found</span>
             </div>
           </div>
         </div>
 
-        {/* Nội dung câu hỏi */}
+        {/* Question Content */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <div className="mb-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center">
                 <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-2">
-                  {currentQuestion.topic}
+                  {currentQuestion.difficulty || "Unknown"}
                 </span>
                 <h2 className="text-xl font-semibold">
-                  Câu {currentQuestionIndex + 1}
+                  Question {currentQuestionIndex + 1}
                 </h2>
               </div>
-              {userAnswer !== null && (
+              {currentQuestion.answered && (
                 <div
                   className={`flex items-center ${
                     isCorrect ? "text-green-600" : "text-red-600"
@@ -286,18 +293,19 @@ const QuizResultDetail = () => {
                   ) : (
                     <XCircle className="h-5 w-5 mr-1" />
                   )}
-                  <span>{isCorrect ? "Đúng" : "Sai"}</span>
+                  <span>{isCorrect ? "Correct" : "Incorrect"}</span>
                 </div>
               )}
             </div>
             <p className="text-lg">{currentQuestion.content}</p>
           </div>
 
-          {/* Các đáp án */}
+          {/* Options */}
           <div className="space-y-3 mb-6">
-            {currentQuestion.options.map((option, index) => {
-              const isUserAnswer = userAnswer === index;
-              const isCorrectAnswer = currentQuestion.correctAnswer === index;
+            {currentQuestion.options.map((option) => {
+              const isUserAnswer = userAnswer === option._id;
+              const isCorrectAnswer =
+                currentQuestion.correctAnswer === option.label;
               let optionClass = "border-gray-200";
 
               if (isUserAnswer && isCorrectAnswer) {
@@ -310,25 +318,25 @@ const QuizResultDetail = () => {
 
               return (
                 <div
-                  key={index}
+                  key={option._id}
                   className={`p-4 border rounded-lg ${optionClass}`}
                 >
                   <div className="flex items-center">
                     <div
                       className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 font-medium
-                        ${
-                          isUserAnswer && isCorrectAnswer
-                            ? "bg-green-600 text-white"
-                            : isUserAnswer && !isCorrectAnswer
-                            ? "bg-red-600 text-white"
-                            : isCorrectAnswer
-                            ? "bg-green-600 text-white"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
+                      ${
+                        isUserAnswer && isCorrectAnswer
+                          ? "bg-green-600 text-white"
+                          : isUserAnswer && !isCorrectAnswer
+                          ? "bg-red-600 text-white"
+                          : isCorrectAnswer
+                          ? "bg-green-600 text-white"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
                     >
-                      {String.fromCharCode(65 + index)}
+                      {option.label}
                     </div>
-                    <span>{option}</span>
+                    <span>{option.text}</span>
                     {isUserAnswer && isCorrectAnswer && (
                       <CheckCircle className="h-5 w-5 text-green-600 ml-auto" />
                     )}
@@ -344,27 +352,21 @@ const QuizResultDetail = () => {
             })}
           </div>
 
-          {/* Giải thích */}
+          {/* Explanation */}
           {currentQuestion.explanation && (
             <div className="mt-6">
               <button
-                onClick={() => {
-                  if (!isPremiumUser) {
-                    setShowPremiumModal(true);
-                  } else {
-                    toggleExplanation(currentQuestionIndex);
-                  }
-                }}
+                onClick={() => toggleExplanation(currentQuestionIndex)}
                 className="flex items-center text-blue-600 hover:text-blue-800"
               >
                 <AlertCircle className="h-5 w-5 mr-2" />
                 {showExplanations[currentQuestionIndex]
-                  ? "Ẩn giải thích"
-                  : "Xem giải thích"}
+                  ? "Hide Explanation"
+                  : "Show Explanation"}
               </button>
               {showExplanations[currentQuestionIndex] && (
                 <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h3 className="font-semibold mb-2">Giải thích:</h3>
+                  <h3 className="font-semibold mb-2">Explanation:</h3>
                   <p>{currentQuestion.explanation}</p>
                 </div>
               )}
@@ -372,7 +374,7 @@ const QuizResultDetail = () => {
           )}
         </div>
 
-        {/* Điều hướng giữa các câu hỏi */}
+        {/* Navigation Buttons */}
         <div className="flex justify-between">
           <button
             onClick={() => goToQuestion(currentQuestionIndex - 1)}
@@ -385,26 +387,30 @@ const QuizResultDetail = () => {
               }`}
           >
             <ChevronLeft className="h-5 w-5 mr-1" />
-            Câu trước
+            Previous Question
           </button>
 
           <button
             onClick={() => goToQuestion(currentQuestionIndex + 1)}
-            disabled={currentQuestionIndex === resultData.questions.length - 1}
+            disabled={
+              currentQuestionIndex ===
+              resultData.questionsWithAnswers.length - 1
+            }
             className={`flex items-center px-4 py-2 rounded-md
               ${
-                currentQuestionIndex === resultData.questions.length - 1
+                currentQuestionIndex ===
+                resultData.questionsWithAnswers.length - 1
                   ? "bg-gray-100 text-gray-400 cursor-not-allowed"
                   : "bg-gray-100 text-gray-800 hover:bg-gray-200"
               }`}
           >
-            Câu tiếp theo
+            Next Question
             <ChevronRight className="h-5 w-5 ml-1" />
           </button>
         </div>
       </div>
 
-      {/* Modal Premium cho phần giải thích chi tiết */}
+      {/* Premium Modal */}
       {showPremiumModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full">
@@ -412,35 +418,36 @@ const QuizResultDetail = () => {
               <div className="inline-flex items-center justify-center p-2 bg-yellow-100 rounded-full mb-4">
                 <PremiumBadge size="lg" />
               </div>
-              <h3 className="text-xl font-bold mb-2">Giải thích chi tiết</h3>
+              <h3 className="text-xl font-bold mb-2">Detailed Explanation</h3>
               <p className="text-gray-600">
-                Xem giải thích chi tiết cho từng câu hỏi là tính năng dành riêng
-                cho thành viên Premium.
+                Viewing detailed explanations is a premium feature.
               </p>
             </div>
 
             <div className="bg-blue-50 rounded-md p-4 mb-6">
               <h4 className="font-medium mb-2">
-                Lợi ích của việc xem giải thích chi tiết:
+                Benefits of detailed explanations:
               </h4>
               <ul className="space-y-2 text-sm">
                 <li className="flex items-start">
                   <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
                     <span className="text-blue-600 text-xs">✓</span>
                   </div>
-                  <span>Hiểu rõ hơn tại sao một đáp án là đúng hoặc sai</span>
+                  <span>
+                    Better understanding of correct and incorrect answers
+                  </span>
                 </li>
                 <li className="flex items-start">
                   <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
                     <span className="text-blue-600 text-xs">✓</span>
                   </div>
-                  <span>Giúp cải thiện kiến thức của bạn nhanh hơn</span>
+                  <span>Improve your knowledge faster</span>
                 </li>
                 <li className="flex items-start">
                   <div className="flex-shrink-0 h-5 w-5 rounded-full bg-blue-100 flex items-center justify-center mt-0.5 mr-2">
                     <span className="text-blue-600 text-xs">✓</span>
                   </div>
-                  <span>Tiếp cận kiến thức chuyên sâu từ các chuyên gia</span>
+                  <span>Access expert knowledge</span>
                 </li>
               </ul>
             </div>
@@ -450,13 +457,13 @@ const QuizResultDetail = () => {
                 to="/pricing"
                 className="flex-1 py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-center"
               >
-                Nâng cấp lên Premium
+                Upgrade to Premium
               </Link>
               <button
                 onClick={() => setShowPremiumModal(false)}
                 className="flex-1 py-2 px-4 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
               >
-                Không, cảm ơn
+                No, thanks
               </button>
             </div>
           </div>

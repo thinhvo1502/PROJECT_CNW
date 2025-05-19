@@ -1,6 +1,6 @@
 "use client";
 
-import type React from "react";
+import React from "react";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -19,11 +19,12 @@ import {
   BookOpen,
   AlertCircle,
 } from "lucide-react";
+import api from "../services/api";
 
 const QuizResult: React.FC = () => {
   const { attemptId } = useParams<{ attemptId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, examId, setExamId } = useAuth();
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +50,10 @@ const QuizResult: React.FC = () => {
         const data = await quizAttemptService.getQuizResult(attemptId);
         console.log("Quiz result data:", data);
         setResult(data);
+        // Set examId when result is loaded
+        if (data.exam?._id) {
+          setExamId(data.exam._id);
+        }
 
         // Kiểm tra xem đã có feedback chưa
         if (data.feedback) {
@@ -65,7 +70,7 @@ const QuizResult: React.FC = () => {
     };
 
     fetchQuizResult();
-  }, [attemptId]);
+  }, [attemptId, setExamId]);
 
   // Xử lý khi gửi feedback
   const handleSubmitFeedback = async () => {
@@ -80,6 +85,22 @@ const QuizResult: React.FC = () => {
       console.error("Error submitting feedback:", err);
       setError(err.message || "Có lỗi xảy ra khi gửi đánh giá");
       setSubmittingFeedback(false);
+    }
+  };
+
+  const handleRetakeQuiz = async () => {
+    if (!examId) {
+      setError("Không tìm thấy thông tin bài thi");
+      return;
+    }
+
+    try {
+      // Navigate to the new quiz attempt
+      // navigate(`/quiz/${response.data.data._id}`);
+      navigate(`/exam/${examId}`);
+    } catch (error) {
+      console.error("Error retaking quiz:", error);
+      setError("Có lỗi xảy ra khi tạo bài kiểm tra mới. Vui lòng thử lại sau.");
     }
   };
 
@@ -102,7 +123,7 @@ const QuizResult: React.FC = () => {
           <span className="block sm:inline">{error}</span>
         </div>
         <button
-          onClick={() => navigate("/quiz-selection")}
+          onClick={() => navigate("/exam")}
           className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
         >
           Quay lại trang chọn bài thi
@@ -264,19 +285,19 @@ const QuizResult: React.FC = () => {
         {/* Các nút hành động */}
         <div className="flex flex-col sm:flex-row justify-center gap-4 mt-8">
           <Link
-            to={`/quiz-result-detail/${attemptId}`}
+            to={`/result-detail/${attemptId}`}
             className="flex items-center justify-center px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
           >
             <FileText className="h-5 w-5 mr-2" />
             Xem chi tiết kết quả
           </Link>
-          <Link
-            to={`/quiz/${result.exam?._id}`}
+          <button
+            onClick={handleRetakeQuiz}
             className="flex items-center justify-center px-6 py-3 border border-blue-600 text-blue-600 rounded-md hover:bg-blue-50 transition-colors"
           >
             <RefreshCw className="h-5 w-5 mr-2" />
             Làm lại bài kiểm tra
-          </Link>
+          </button>
         </div>
       </div>
 

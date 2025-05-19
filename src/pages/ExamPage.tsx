@@ -1,6 +1,6 @@
 "use client";
 
-import type React from "react";
+import React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -111,7 +111,7 @@ const QuizTaking: React.FC = () => {
 
     const currentQuestion =
       quizAttempt.questionsWithDetail[currentQuestionIndex];
-
+    console.log("selectedAnswer", selectedAnswer);
     try {
       setSubmitting(true);
       const response = await quizAttemptService.submitAnswer(

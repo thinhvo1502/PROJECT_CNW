@@ -24,8 +24,11 @@ import {
   Trash2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
-import { uploadProfileImage } from "../services/userService";
-
+import {
+  uploadProfileImage,
+  updateProfileWithImage,
+} from "../services/userService";
+import React from "react";
 // Định nghĩa kiểu dữ liệu cho form đổi mật khẩu
 interface PasswordChangeForm {
   currentPassword: string;
@@ -133,14 +136,19 @@ const Profile = () => {
       const updateData = {
         name: editForm.name,
         email: editForm.email,
-        // class: editForm.class,
+        class: editForm.class,
         // profileImage: editForm.profileImage,
       };
-
+      console.log("newProfileImage", newProfileImage);
+      if (newProfileImage) {
+        await updateProfileWithImage(updateData, newProfileImage);
+      } else {
+        await updateUserProfile(user.id, updateData);
+      }
+      await refreshUserInfo();
       // Gọi API cập nhật thông tin người dùng
-      console.log("profile: user.id", user?.id);
-      await updateUserProfile(user.id, updateData);
       setIsEditing(false);
+      setNewProfileImage(null);
       showNotification("success", "Cập nhật thông tin thành công!");
     } catch (error: any) {
       showNotification(
@@ -160,39 +168,33 @@ const Profile = () => {
       [name]: value,
     }));
   };
-
+  // State cho file ảnh mới
+  const [newProfileImage, setNewProfileImage] = useState<File | null>(null);
   // Xử lý khi thay đổi avatar
   const handleAvatarChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
     try {
       setIsLoading(true);
-
+      // Kiểm tra kích thước file (giới hạn 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        showNotification("error", "Kích thước ảnh không được vượt quá 5MB!");
+        return;
+      }
+      // Kiểm tra loại file
+      if (!file.type.startsWith("image/")) {
+        showNotification("error", "Vui lòng chọn file ảnh!");
+        return;
+      }
       // Tạo URL tạm thời để hiển thị preview
       const previewUrl = URL.createObjectURL(file);
       setEditForm((prev) => ({
         ...prev,
         profileImage: previewUrl,
       }));
-
-      // Upload ảnh lên server
-      const result = await uploadProfileImage(file);
-
-      // Cập nhật URL ảnh thực tế từ server
-      setEditForm((prev) => ({
-        ...prev,
-        profileImage: result.url,
-      }));
-
-      // Cập nhật thông tin người dùng với URL ảnh mới
-      await updateUserProfile(user.id, { profileImage: result.url });
-
-      showNotification("success", "Cập nhật ảnh đại diện thành công!");
+      setNewProfileImage(file);
     } catch (error: any) {
-      showNotification(
-        "error",
-        error.message || "Cập nhật ảnh đại diện thất bại!"
-      );
+      showNotification("error", error.message || "Không thể tải ảnh lên!");
     } finally {
       setIsLoading(false);
     }
@@ -327,12 +329,24 @@ const Profile = () => {
   const profileCompletion = calculateProfileCompletion();
 
   // Dữ liệu mẫu cho thống kê học tập
-  const learningStats = {
-    totalQuizzes: 25,
-    averageScore: 78.5,
-    completedTopics: 6,
-    totalTopics: 8,
-  };
+  const [learningStats, setLearningStats] = useState({
+    totalQuizzes: 0,
+    averageScore: 0,
+    completedTopics: 0,
+    totalTopics: 0,
+  });
+
+  // Cập nhật learningStats khi user thay đổi
+  useEffect(() => {
+    if (user?.learningStats) {
+      setLearningStats({
+        totalQuizzes: user.learningStats.totalAttempts || 0,
+        averageScore: user.learningStats.averageScore || 0,
+        completedTopics: user.learningStats.topicStats.learned || 0,
+        totalTopics: user.learningStats.topicStats.total || 0,
+      });
+    }
+  }, [user]);
 
   // Dữ liệu mẫu cho thông tin tài khoản
   const accountInfo = {
@@ -494,7 +508,7 @@ const Profile = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center text-gray-600">
                       <BookOpen className="h-5 w-5 mr-2 text-blue-500" />
-                      <span>Bài kiểm tra đã làm</span>
+                      <span>Lượt làm bài </span>
                     </div>
                     <span className="font-medium">
                       {learningStats.totalQuizzes}
@@ -512,7 +526,7 @@ const Profile = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center text-gray-600">
                       <CheckCircle className="h-5 w-5 mr-2 text-blue-500" />
-                      <span>Chủ đề đã hoàn thành</span>
+                      <span>Chủ đề đang học: </span>
                     </div>
                     <span className="font-medium">
                       {learningStats.completedTopics}/

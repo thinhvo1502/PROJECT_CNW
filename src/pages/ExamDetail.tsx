@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   Clock,
@@ -25,7 +25,7 @@ import quizAttemptService from "../services/quizAttemptService";
 const ExamDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, setExamId } = useAuth();
 
   const [exam, setExam] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -79,6 +79,7 @@ const ExamDetail = () => {
       setStartingQuiz(true);
       const quizAttempt = await quizAttemptService.startQuiz(id);
       const attemptId = quizAttempt._id;
+      setExamId(id);
       navigate(`/quiz/${attemptId}`);
     } catch (err: any) {
       setError(err.message || "Có lỗi xảy ra khi bắt đầu bài thi");

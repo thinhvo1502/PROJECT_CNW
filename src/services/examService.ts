@@ -1,3 +1,4 @@
+import { LetterText } from "lucide-react";
 import api from "../utils/api";
 
 // Định nghĩa kiểu dữ liệu cho đề thi
@@ -31,13 +32,12 @@ export interface Exam {
       }
     | string
   >;
-  topics: Array<
-    | {
-        _id: string;
-        name: string;
-      }
-    | string
-  >;
+  topic: {
+    _id: string;
+    name: string;
+    category: string;
+  };
+
   accessLevel: "free" | "premium";
   createdAt: string;
   updatedAt: string;
@@ -49,6 +49,7 @@ export interface Exam {
     averageScore: number;
     passRate: number;
   };
+  difficulty: string;
 }
 
 // Định nghĩa kiểu dữ liệu cho bộ lọc
@@ -68,7 +69,7 @@ export interface ExamFilters {
 interface ExamResponse {
   success: boolean;
   message: string;
-  data: Exam[];
+  exams: Exam[];
   pagination: {
     page: number;
     limit: number;
@@ -105,11 +106,12 @@ export const getExams = async (
     const response = await api.get<ExamResponse>(
       `/exams?${queryParams.toString()}`
     );
+    console.log("response ser", response);
 
     // Kiểm tra response
     if (response.data && response.data.success) {
       return {
-        exams: response.data.data,
+        exams: response.data.exams,
         pagination: response.data.pagination,
       };
     } else {

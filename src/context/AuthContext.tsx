@@ -1,5 +1,5 @@
 // context quản lý trạng thái đăng nhập/ đăng xuất
-import type React from "react";
+import React from "react";
 import { setCookie, getCookie, deleteCookie } from "../utils/cookies";
 import api from "../utils/api";
 import {
@@ -21,6 +21,14 @@ interface User {
   class?: string;
   role: "student" | "admin";
   isActive: boolean;
+  learningStats: {
+    totalAttempts: number;
+    averageScore: number;
+    topicStats: {
+      learned: number;
+      total: number;
+    };
+  };
   // purchasedExams: string[];
 }
 // Định nghĩa kiểu dữ liệu cho AuthContext
@@ -45,6 +53,8 @@ interface AuthContextType {
     userData: UpdateUserData
   ) => Promise<User>;
   deleteUserAccount: (userId: string) => Promise<void>;
+  examId: string | null;
+  setExamId: (id: string | null) => void;
 }
 // Định nghĩa kiểu dữ liệu cho dữ liệu đăng ký
 interface RegisterData {
@@ -67,8 +77,9 @@ export const AuthProvider: React.FC<{
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [examId, setExamId] = useState<string | null>(null);
 
-  const API_URL = "https://f5bd-171-250-162-82.ngrok-free.app/api";
+  const API_URL = "http://localhost:5000/api";
   // Kiểm tra xem người dùng đã đăng nhập chưa khi component mount
   useEffect(() => {
     const checkLoggedIn = async () => {
@@ -128,6 +139,7 @@ export const AuthProvider: React.FC<{
     };
     checkLoggedIn();
   }, []);
+
   // Đăng nhập
   const login = async (email: string, password: string) => {
     try {
@@ -338,6 +350,8 @@ export const AuthProvider: React.FC<{
       refreshUserInfo,
       updateUserProfile,
       deleteUserAccount,
+      examId,
+      setExamId,
     }),
     [
       user,
@@ -353,6 +367,8 @@ export const AuthProvider: React.FC<{
       refreshUserInfo,
       updateUserProfile,
       deleteUserAccount,
+      examId,
+      setExamId,
     ]
   );
   return (
