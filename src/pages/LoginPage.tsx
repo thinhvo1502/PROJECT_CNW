@@ -35,6 +35,21 @@ const Login = () => {
     }
   }, [error, clearError]);
 
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Lưu token mới vào cookie
+      const token = localStorage.getItem("auth_token");
+      if (token) {
+        document.cookie = `auth_token=${token}; path=/; max-age=86400`;
+        console.log(
+          "Token đã lưu sau đăng nhập:",
+          token.substring(0, 15) + "..."
+        );
+      }
+
+      // KHÔNG điều hướng ở đây - để AuthContext xử lý điều hướng dựa vào role
+    }
+  }, [isAuthenticated]);
   // Xử lý thay đổi input
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({

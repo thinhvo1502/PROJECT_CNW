@@ -128,6 +128,7 @@ export const AuthProvider: React.FC<{
   }, []);
 
   // Đăng nhập
+  // Sửa trong hàm login
   const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
@@ -137,26 +138,32 @@ export const AuthProvider: React.FC<{
         email,
         password,
       });
-      // Lưu token vào cookie và thông tin người dùng vào localStorage
-      setCookie("auth_token", response.data.data.token, 7);
+
+      // Lưu token vào BOTH cookie và localStorage để đảm bảo
+      const token = response.data.data.token;
+      setCookie("auth_token", token, 7); // Lưu 7 ngày
+      localStorage.setItem("auth_token", token);
       localStorage.setItem("user", JSON.stringify(response.data.data.user));
+
+      // Lấy và log role để debug
+      const userRole = response.data.data.user.role;
+      console.log("User role từ API:", userRole);
+
       // Cập nhật state
       setUser(response.data.data.user);
       setToken(response.data.data.token);
       setIsAuthenticated(true);
 
-      // Điều hướng dựa vào role
-      if (response.data.data.user.role === "admin") {
+      // Kiểm tra role không phân biệt hoa thường
+      if (typeof userRole === "string" && userRole.toLowerCase() === "admin") {
+        console.log("Điều hướng đến trang admin");
         navigate("/admin/home");
       } else {
+        console.log("Điều hướng đến trang user");
         navigate("/home");
       }
     } catch (err: any) {
-      if (err.response && err.response.data) {
-        setError(err.response.data.message || "Đăng nhập thất bại");
-      } else {
-        setError("Không thể kết nối đến máy chủ");
-      }
+      // ...error handling code
     } finally {
       setIsLoading(false);
     }
@@ -191,10 +198,13 @@ export const AuthProvider: React.FC<{
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("user");
+    deleteCookie("auth_token");
     setUser(null);
     setToken(null);
     setIsAuthenticated(false);
+    navigate("/login");
   };
 
   const clearError = () => {

@@ -1,6 +1,10 @@
 "use client";
+
 import { Link } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import api from "../utils/api";
+import { getCookie } from "../utils/cookies";
+import axios from "axios";
 import {
   BarChart,
   Bar,
@@ -43,7 +47,8 @@ import {
   ArrowUpRight,
   Sparkles,
 } from "lucide-react";
-
+// Thêm vào đầu file, sau các import
+const API_BASE_URL = "https://437f-113-161-89-176.ngrok-free.app";
 const userActivityData = [
   { name: "Tháng 1", "Số lượt đăng nhập": 80, "Số đề thi đã làm": 30 },
   { name: "Tháng 2", "Số lượt đăng nhập": 100, "Số đề thi đã làm": 40 },
@@ -52,7 +57,7 @@ const userActivityData = [
 ];
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444"];
-
+const PAGE_SIZE = 10;
 const ManageUsers = () => {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -72,78 +77,124 @@ const ManageUsers = () => {
   const [animateStats, setAnimateStats] = useState(false);
   const [chartHover, setChartHover] = useState(null);
   const [activeTab, setActiveTab] = useState("all");
-
+  const [users, setUsers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [loadingAction, setLoadingAction] = useState("");
   // Refs for scroll animations
   const tableRef = useRef(null);
   const chartsRef = useRef(null);
-
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: "Nguyễn Văn A",
-      email: "nguyenvana@gmail.com",
-      joinDate: "01/01/2025",
-      role: "Học sinh",
-      examsCompleted: 15,
-      avgScore: 7.8,
-      lastLogin: "15/04/2025",
-      phone: "0912345678",
-      address: "Hà Nội",
-      status: "Hoạt động",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    {
-      id: 2,
-      name: "Trần Thị B",
-      email: "tranthib@gmail.com",
-      joinDate: "10/01/2025",
-      role: "Giáo viên",
-      examsCompleted: 0,
-      avgScore: 0,
-      lastLogin: "14/04/2025",
-      phone: "0923456789",
-      address: "Hồ Chí Minh",
-      status: "Hoạt động",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    {
-      id: 3,
-      name: "Lê Văn C",
-      email: "levanc@gmail.com",
-      joinDate: "20/01/2025",
-      role: "Học sinh",
-      examsCompleted: 10,
-      avgScore: 6.5,
-      lastLogin: "12/04/2025",
-      phone: "0934567890",
-      address: "Đà Nẵng",
-      status: "Hoạt động",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    {
-      id: 4,
-      name: "Phạm Thị D",
-      email: "phamthid@gmail.com",
-      joinDate: "05/02/2025",
-      role: "Học sinh",
-      examsCompleted: 8,
-      avgScore: 8.0,
-      lastLogin: "10/04/2025",
-      phone: "0945678901",
-      address: "Cần Thơ",
-      status: "Tạm khóa",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-  ]);
-
+  const mapRoleToAPIValue = (displayRole) => {
+    switch (displayRole) {
+      case "Học sinh":
+        return "user";
+      case "Giáo viên":
+        return "teacher";
+      case "Quản trị viên":
+        return "admin";
+      default:
+        return displayRole.toLowerCase(); // Fallback
+    }
+  };
+  // Thêm hàm mapping hiển thị role
+  const displayRoleLabel = (apiRole) => {
+    switch (apiRole) {
+      case "user":
+        return "Học sinh";
+      case "teacher":
+        return "Giáo viên";
+      case "admin":
+        return "Quản trị viên";
+      default:
+        return apiRole;
+    }
+  };
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "Học sinh",
+    role: "user",
     phone: "",
     address: "",
+    password: "", // Thêm trường password
+    confirmPassword: "", // Thêm trường xác nhận mật khẩu
   });
 
+  // Fetch users from API
+  // Sửa lại hàm fetchUsers để hoạt động đúng
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      console.log("Bắt đầu tải dữ liệu người dùng...");
+
+      // Kết hợp kiểm tra token từ cả localStorage và cookie
+      const localToken = localStorage.getItem("auth_token");
+      const cookieToken = getCookie("auth_token");
+      const token = localToken || cookieToken;
+
+      if (!token) {
+        console.error(
+          "Không tìm thấy token - chuyển hướng đến trang đăng nhập"
+        );
+        showNotificationMessage(
+          "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
+          "error"
+        );
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 2000);
+        return;
+      }
+
+      // Thêm timestamp để tránh cache
+      const timestamp = new Date().getTime();
+      const apiUrl = `${API_BASE_URL}/api/users?_t=${timestamp}`;
+
+      console.log("Gửi yêu cầu đến:", apiUrl);
+      console.log("Sử dụng token:", token.substring(0, 10) + "...");
+
+      // Gửi request API - LOẠI BỎ CÁC HEADER GÂY LỖI CORS
+      const response = await axios.get(apiUrl, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+
+      console.log("Nhận được phản hồi API:", response.status);
+      console.log("Dữ liệu phản hồi:", response.data);
+
+      // Xử lý response như trước đây
+      if (Array.isArray(response.data)) {
+        console.log(`Đã tải ${response.data.length} người dùng (dạng mảng)`);
+        setUsers(response.data);
+      } else if (response.data && typeof response.data === "object") {
+        const userData = response.data.data || [];
+        console.log(`Đã tải ${userData.length} người dùng (dạng đối tượng)`);
+        setUsers(userData);
+      } else {
+        console.warn("Cấu trúc phản hồi không như mong đợi:", response.data);
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error("Lỗi khi tải dữ liệu người dùng:", error);
+      // Log và xử lý lỗi như trước
+      setUsers([]);
+      showNotificationMessage(`Lỗi tải dữ liệu: ${error.message}`, "error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  // Trong phần useEffect fetchUsers
+  useEffect(() => {
+    fetchUsers(); // Đảm bảo gọi hàm này
+  }, []);
+  // Đặt đoạn code này sau phần khai báo statistics với useMemo
+
+  // Các biến tính toán từ state nên đặt bên ngoài useEffect
+  const totalPages = Math.ceil(users.length / PAGE_SIZE);
+  const paginatedUsers = users.slice(
+    (currentPage - 1) * PAGE_SIZE,
+    currentPage * PAGE_SIZE
+  );
   useEffect(() => {
     // Simulate loading
     const timer = setTimeout(() => {
@@ -206,38 +257,179 @@ const ManageUsers = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newUser = {
-      id: formData.id || Math.floor(Math.random() * 10000),
-      name: formData.name,
-      email: formData.email,
-      joinDate: new Date().toLocaleDateString("vi-VN"),
-      role: formData.role,
-      examsCompleted: 0,
-      avgScore: 0,
-      lastLogin: "-",
-      phone: formData.phone || "-",
-      address: formData.address || "-",
-      status: "Hoạt động",
-      avatar: "/placeholder.svg?height=40&width=40",
-    };
 
-    if (formData.id) {
-      // Update existing user
-      setUsers((prev) =>
-        prev.map((user) =>
-          user.id === formData.id ? { ...user, ...newUser } : user
-        )
+    // Kiểm tra xác nhận mật khẩu
+    if (formData.password && formData.password !== formData.confirmPassword) {
+      showNotificationMessage(
+        "Mật khẩu và xác nhận mật khẩu không khớp",
+        "error"
       );
-      showNotificationMessage("Đã cập nhật người dùng thành công", "success");
-    } else {
-      // Add new user
-      setUsers((prev) => [...prev, newUser]);
-      showNotificationMessage("Đã thêm người dùng mới thành công", "success");
+      return;
     }
 
-    handleCancel();
+    setIsLoading(true);
+    setLoadingAction("update");
+
+    try {
+      if (formData.id) {
+        // Tìm thông tin user hiện tại
+        const currentUser = users.find(
+          (user) => user.id === formData.id || user._id === formData.id
+        );
+
+        if (!currentUser) {
+          throw new Error("Không tìm thấy thông tin người dùng");
+        }
+
+        // Chuẩn bị dữ liệu cập nhật (KHÔNG BAO GỒM PASSWORD)
+        const updatedUserData = {
+          name: formData.name || currentUser.name,
+          email: formData.email || currentUser.email,
+          role: mapRoleToAPIValue(formData.role) || currentUser.role,
+          // Chỉ gửi các trường không rỗng hoặc undefined
+          ...(formData.phone && formData.phone.trim() !== ""
+            ? { phone: formData.phone }
+            : {}),
+          ...(formData.address && formData.address.trim() !== ""
+            ? { address: formData.address }
+            : {}),
+        };
+
+        // QUAN TRỌNG: KHÔNG thêm password vào updatedUserData
+
+        // Log dữ liệu để kiểm tra trước khi gửi
+        console.log(
+          "Dữ liệu gửi đi (đã định dạng):",
+          JSON.stringify(updatedUserData, null, 2)
+        );
+
+        // API request cho thông tin người dùng
+        const apiUrl = `${API_BASE_URL}/api/users/${formData.id}`;
+        console.log("Gửi yêu cầu PUT đến:", apiUrl);
+        console.log("Dữ liệu cập nhật:", updatedUserData);
+
+        const response = await axios.put(apiUrl, updatedUserData, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        console.log("API update response:", response.data);
+
+        // Nếu người dùng đã nhập password mới, gửi riêng yêu cầu cập nhật mật khẩu
+        if (formData.password && formData.password.trim() !== "") {
+          try {
+            // Có thể cần URL endpoint riêng cho việc cập nhật mật khẩu
+            const passwordUpdateUrl = `${API_BASE_URL}/api/users/${formData.id}/change-password`;
+
+            await axios.post(
+              passwordUpdateUrl,
+              { password: formData.password },
+              {
+                headers: {
+                  Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+
+            showNotificationMessage(
+              "Đã cập nhật mật khẩu thành công",
+              "success"
+            );
+          } catch (passwordError) {
+            console.error("Error updating password:", passwordError);
+            showNotificationMessage(
+              `Cập nhật thông tin thành công nhưng không thể cập nhật mật khẩu: ${
+                passwordError.response?.data?.message || passwordError.message
+              }`,
+              "error"
+            );
+          }
+        }
+
+        // Cập nhật UI sau khi thành công
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === formData.id || user._id === formData.id
+              ? {
+                  ...user,
+                  name: formData.name,
+                  email: formData.email,
+                  phone: formData.phone || "-",
+                  address: formData.address || "-",
+                  role: formData.role,
+                }
+              : user
+          )
+        );
+        // Tự động làm mới dữ liệu sau khi cập nhật
+        await fetchUsers();
+        // Đóng form
+        handleCancel();
+        // Hiển thị thông báo thành công
+        showNotificationMessage(
+          "Đã cập nhật thông tin người dùng thành công",
+          "success"
+        );
+      }
+    } catch (error) {
+      console.error("Error updating user:", error);
+
+      // Log chi tiết hơn về lỗi
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response headers:", error.response.headers);
+
+        // Hiển thị chi tiết lỗi xác thực nếu có
+        if (error.response.data && error.response.data.errors) {
+          console.error("Validation errors:", error.response.data.errors);
+
+          // Log mỗi lỗi riêng lẻ để dễ đọc
+          error.response.data.errors.forEach((err, index) => {
+            if (typeof err === "object") {
+              console.error(
+                `Lỗi ${index + 1}:`,
+                err.field || "",
+                err.message || ""
+              );
+            } else {
+              console.error(`Lỗi ${index + 1}:`, err);
+            }
+          });
+
+          // Tạo thông báo lỗi từ mảng lỗi
+          const errorMessages = error.response.data.errors
+            .map((err) => {
+              if (typeof err === "object") {
+                return `${err.field || ""}: ${err.message || ""}`;
+              }
+              return err;
+            })
+            .join("; ");
+
+          showNotificationMessage(`Lỗi xác thực: ${errorMessages}`, "error");
+        } else {
+          showNotificationMessage(
+            `Lỗi khi cập nhật: ${
+              error.response.data.message ||
+              error.response.data ||
+              error.message
+            }`,
+            "error"
+          );
+        }
+      } else {
+        showNotificationMessage(`Lỗi khi cập nhật: ${error.message}`, "error");
+      }
+    } finally {
+      setIsLoading(false);
+      setLoadingAction("");
+    }
   };
 
   const handleSearch = (e) => {
@@ -249,22 +441,70 @@ const ManageUsers = () => {
     setShowDeleteConfirm(true);
   };
 
-  const handleDeleteUser = () => {
-    setUsers((prev) => prev.filter((user) => user.id !== userToDelete));
-    setShowDeleteConfirm(false);
-    showNotificationMessage("Đã xóa người dùng thành công", "success");
+  const handleDeleteUser = async () => {
+    setIsLoading(true);
+    setLoadingAction("delete");
+    try {
+      // Sử dụng URL API dựa trên ID người dùng cần xóa
+      const apiUrl = `${API_BASE_URL}/api/users/${userToDelete}`;
+      console.log("Gửi yêu cầu DELETE đến:", apiUrl);
+
+      // Sử dụng custom URL thay vì api.delete
+      await axios.delete(apiUrl, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+        },
+      });
+
+      // Tự động làm mới dữ liệu sau khi xóa
+      await fetchUsers();
+      setShowDeleteConfirm(false);
+      // Cập nhật UI bằng cách loại bỏ người dùng đã xóa
+      setUsers((prev) =>
+        prev.filter(
+          (user) => user.id !== userToDelete && user._id !== userToDelete
+        )
+      );
+
+      // Hiển thị thông báo thành công
+      showNotificationMessage("Đã xóa người dùng thành công", "success");
+    } catch (error) {
+      console.error("Error deleting user:", error);
+
+      // Log chi tiết hơn về lỗi
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        console.error("Error response status:", error.response.status);
+        console.error("Error response headers:", error.response.headers);
+
+        showNotificationMessage(
+          `Lỗi khi xóa: ${
+            error.response.data.message || error.response.data || error.message
+          }`,
+          "error"
+        );
+      } else {
+        showNotificationMessage(`Lỗi khi xóa: ${error.message}`, "error");
+      }
+    } finally {
+      setIsLoading(false);
+      setLoadingAction("");
+      setShowDeleteConfirm(false);
+    }
   };
 
   const handleEditUser = (id) => {
-    const userToEdit = users.find((user) => user.id === id);
+    const userToEdit = users.find((user) => user.id === id || user._id === id);
     if (userToEdit) {
       setFormData({
-        id: userToEdit.id,
+        id: userToEdit._id || userToEdit.id,
         name: userToEdit.name,
         email: userToEdit.email,
-        role: userToEdit.role,
+        role: displayRoleLabel(userToEdit.role), // Chuyển đổi role từ API sang hiển thị
         phone: userToEdit.phone !== "-" ? userToEdit.phone : "",
         address: userToEdit.address !== "-" ? userToEdit.address : "",
+        password: "",
+        confirmPassword: "",
       });
       setShowForm(true);
     }
@@ -310,33 +550,91 @@ const ManageUsers = () => {
   };
 
   // Lọc người dùng theo tìm kiếm, vai trò và tab
-  const filteredUsers = users.filter((user) => {
-    const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRole = selectedRole === "Tất cả" || user.role === selectedRole;
-    const matchesTab =
-      activeTab === "all" ||
-      (activeTab === "active" && user.status === "Hoạt động") ||
-      (activeTab === "inactive" && user.status === "Tạm khóa");
+  // Lọc người dùng theo tìm kiếm, vai trò và tab
+  const filteredUsers = useMemo(() => {
+    return paginatedUsers.filter((user) => {
+      const searchId = String(user.id || user._id || "").toLowerCase();
+      const matchesSearch =
+        searchId.includes(searchTerm.toLowerCase()) ||
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesRole =
+        selectedRole === "Tất cả" || user.role === selectedRole;
+      const matchesTab =
+        activeTab === "all" ||
+        (activeTab === "active" && user.isActive) ||
+        (activeTab === "inactive" && !user.isActive);
 
-    return matchesSearch && matchesRole && matchesTab;
-  });
+      return matchesSearch && matchesRole && matchesTab;
+    });
+  }, [paginatedUsers, searchTerm, selectedRole, activeTab]);
 
   // Tính tổng số người dùng
   const totalUsers = users.length;
-  const studentCount = users.filter((user) => user.role === "Học sinh").length;
-  const teacherCount = users.filter((user) => user.role === "Giáo viên").length;
-  const activeUsers = users.filter(
-    (user) => user.status === "Hoạt động"
+  const studentCount = users.filter(
+    (user) => user.role === "user" || user.role === "Học sinh"
   ).length;
+  const teacherCount = users.filter(
+    (user) => user.role === "teacher" || user.role === "Giáo viên"
+  ).length;
+  const activeUsers = users.filter((user) => user.isActive === true).length;
 
   // Tính tổng số đề thi đã làm
   const totalExamsCompleted = users.reduce(
     (sum, user) => sum + (user.examsCompleted || 0),
     0
   );
+  const statistics = useMemo(() => {
+    // Tính tổng số người dùng
+    const totalUsers = users.length;
 
+    const studentCount = users.filter(
+      (user) => user.role === "user" || user.role === "Học sinh"
+    ).length;
+
+    const teacherCount = users.filter(
+      (user) => user.role === "teacher" || user.role === "Giáo viên"
+    ).length;
+
+    const activeUsers = users.filter((user) => user.isActive === true).length;
+
+    // Tính phần trăm
+    const studentPercentage =
+      totalUsers > 0 ? Math.round((studentCount / totalUsers) * 100) : 0;
+    const activePercentage =
+      totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0;
+
+    // Tính tổng số đề thi đã làm
+    const totalExamsCompleted = users.reduce(
+      (sum, user) => sum + (user.learningStats?.totalAttempts || 0),
+      0
+    );
+
+    // Tính điểm trung bình
+    const usersWithScores = users.filter(
+      (user) => user.learningStats?.averageScore > 0
+    );
+    const averageScore =
+      usersWithScores.length > 0
+        ? (
+            users.reduce(
+              (sum, user) => sum + (user.learningStats?.averageScore || 0),
+              0
+            ) / usersWithScores.length
+          ).toFixed(1)
+        : "0.0";
+
+    return {
+      totalUsers,
+      studentCount,
+      teacherCount,
+      activeUsers,
+      totalExamsCompleted,
+      averageScore,
+      studentPercentage,
+      activePercentage,
+    };
+  }, [users]); // Chỉ tính lại khi users thay đổi
   // Dữ liệu cho biểu đồ tròn phân bố điểm
   const scoreDistribution = [
     {
@@ -519,22 +817,6 @@ const ManageUsers = () => {
                   onChange={handleSearch}
                 />
               </div>
-
-              <button className="relative rounded-full bg-gray-100 p-2 text-gray-600 hover:bg-gray-200">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-medium text-white">
-                  3
-                </span>
-              </button>
-
-              <button
-                onClick={handleAddUser}
-                className="group flex items-center rounded-lg bg-blue-600 px-4 py-2 text-white shadow-md transition-all hover:bg-blue-700 hover:shadow-lg"
-              >
-                <UserPlus className="mr-2 h-4 w-4 transition-transform duration-300 group-hover:rotate-12" />
-                <span className="hidden sm:inline">Thêm Người dùng</span>
-                <span className="sm:hidden">Thêm</span>
-              </button>
             </div>
           </div>
         </header>
@@ -558,14 +840,14 @@ const ManageUsers = () => {
                   <p className="text-sm text-gray-500">Tổng số học sinh</p>
                   <div className="flex items-end">
                     <p className="text-3xl font-bold text-gray-800">
-                      {studentCount}
+                      {statistics.studentCount}
                     </p>
                     <p className="ml-2 text-sm font-medium text-green-600">
-                      +5%
+                      {`${statistics.studentPercentage}%`}
                     </p>
                   </div>
                   <p className="mt-1 text-xs text-gray-500">
-                    Tổng: {totalUsers} người dùng
+                    Tổng: {statistics.totalUsers} người dùng
                   </p>
                 </div>
               </div>
@@ -574,7 +856,7 @@ const ManageUsers = () => {
                   className="h-1 rounded-full bg-blue-500 transition-all duration-1000"
                   style={{
                     width: animateStats
-                      ? `${(studentCount / totalUsers) * 100}%`
+                      ? `${statistics.studentPercentage}%`
                       : "0%",
                   }}
                 ></div>
@@ -702,7 +984,7 @@ const ManageUsers = () => {
           {/* Bảng danh sách người dùng */}
           <div
             ref={tableRef}
-            className="mb-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg transition-all duration-300 hover:shadow-xl opacity-0"
+            className="mb-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg transition-all duration-300 hover:shadow-xl"
           >
             <div className="border-b p-6">
               <h2 className="text-lg font-semibold text-gray-800">
@@ -717,9 +999,6 @@ const ManageUsers = () => {
                     <th className="px-6 py-4 text-left font-medium">Họ tên</th>
                     <th className="px-6 py-4 text-left font-medium">Email</th>
 
-                    <th className="px-6 py-4 text-left font-medium">
-                      Ngày tham gia
-                    </th>
                     <th className="px-6 py-4 text-left font-medium">
                       Số đề thi đã làm
                     </th>
@@ -738,19 +1017,23 @@ const ManageUsers = () => {
                   {filteredUsers.length > 0 ? (
                     filteredUsers.map((user, index) => (
                       <tr
-                        key={user.id}
+                        key={user.id || user._id}
                         className="border-b border-gray-100 transition-colors hover:bg-blue-50/30"
                         style={{
                           animationDelay: `${index * 100}ms`,
                           animation: "fadeIn 0.5s ease-in-out forwards",
                         }}
                       >
-                        <td className="px-6 py-4 text-gray-800">{user.id}</td>
+                        <td className="px-6 py-4 text-gray-800">
+                          {user.id || user._id}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-full bg-gray-100">
                               <img
-                                src={user.avatar || "/placeholder.svg"}
+                                src={
+                                  user.profileImage?.url || "/placeholder.svg"
+                                }
                                 alt={user.name}
                                 className="h-full w-full object-cover"
                               />
@@ -760,7 +1043,7 @@ const ManageUsers = () => {
                                 {user.name}
                               </p>
                               <p className="text-xs text-gray-500">
-                                {user.phone}
+                                {user.phone || ""}
                               </p>
                             </div>
                           </div>
@@ -770,23 +1053,20 @@ const ManageUsers = () => {
                         </td>
 
                         <td className="px-6 py-4 text-gray-800">
-                          {user.joinDate}
-                        </td>
-                        <td className="px-6 py-4 text-gray-800">
-                          {user.examsCompleted}
+                          {user.learningStats?.totalAttempts ?? 0}
                         </td>
                         <td className="px-6 py-4">
-                          {user.avgScore > 0 ? (
+                          {user.learningStats?.averageScore > 0 ? (
                             <span
                               className={`font-medium ${
-                                user.avgScore >= 8
+                                user.learningStats.averageScore >= 8
                                   ? "text-green-600"
-                                  : user.avgScore >= 6.5
+                                  : user.learningStats.averageScore >= 6.5
                                   ? "text-blue-600"
                                   : "text-orange-600"
                               }`}
                             >
-                              {user.avgScore.toFixed(1)}
+                              {user.learningStats.averageScore.toFixed(1)}
                             </span>
                           ) : (
                             <span className="text-gray-400">
@@ -797,43 +1077,43 @@ const ManageUsers = () => {
                         <td className="px-6 py-4">
                           <span
                             className={`inline-flex rounded-full px-3 py-1.5 text-sm font-medium ${
-                              user.status === "Hoạt động"
+                              user.isActive
                                 ? "bg-green-100 text-green-800"
                                 : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {user.status}
+                            {user.isActive ? "Hoạt động" : "Tạm khóa"}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex items-center space-x-2">
                             <button
+                              className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
                               onClick={() => handleViewUserDetails(user)}
-                              className="group flex items-center rounded-lg bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100"
+                              title="Xem"
                             >
-                              <Eye className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                              Xem
+                              <Eye className="h-4 w-4" />
+                              <span className="sr-only">Xem</span>
                             </button>
                             <button
-                              onClick={() => handleEditUser(user.id)}
-                              className="group flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100"
+                              className="rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-200"
+                              onClick={() =>
+                                handleEditUser(user.id || user._id)
+                              }
+                              title="Sửa thông tin và mật khẩu"
                             >
-                              <Edit className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                              Sửa
+                              <Edit className="h-4 w-4" />
+                              <span className="sr-only">Sửa</span>
                             </button>
                             <button
-                              onClick={() => confirmDeleteUser(user.id)}
-                              className="group flex items-center rounded-lg bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-100"
+                              className="rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200"
+                              onClick={() =>
+                                confirmDeleteUser(user.id || user._id)
+                              }
+                              title="Xóa"
                             >
-                              <Trash2 className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                              Xóa
-                            </button>
-                            <button
-                              onClick={() => handleResetPassword(user.id)}
-                              className="group flex items-center rounded-lg bg-amber-50 px-3 py-1.5 text-sm font-medium text-amber-600 transition-colors hover:bg-amber-100"
-                            >
-                              <Key className="mr-1.5 h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
-                              Cập nhật mật khẩu
+                              <Trash2 className="h-4 w-4" />
+                              <span className="sr-only">Xóa</span>
                             </button>
                           </div>
                         </td>
@@ -842,7 +1122,7 @@ const ManageUsers = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={9}
+                        colSpan={8}
                         className="px-6 py-8 text-center text-gray-500"
                       >
                         Không tìm thấy người dùng nào phù hợp với tìm kiếm
@@ -852,25 +1132,55 @@ const ManageUsers = () => {
                 </tbody>
               </table>
             </div>
-
-            {filteredUsers.length > 0 && (
+            {/* Pagination */}
+            {totalPages > 1 && (
               <div className="flex items-center justify-between border-t p-4">
                 <div className="text-sm text-gray-500">
-                  Hiển thị {filteredUsers.length} trên tổng số {users.length}{" "}
-                  người dùng
+                  Trang {currentPage} / {totalPages}
                 </div>
                 <div className="flex items-center space-x-2">
-                  <button className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50">
-                    <ChevronDown className="h-4 w-4 rotate-90" />
+                  <button
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(1)}
+                  >
+                    &lt;&lt;
                   </button>
-                  <button className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-blue-600 text-white transition-colors hover:bg-blue-700">
-                    1
+                  <button
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  >
+                    &lt;
                   </button>
-                  <button className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50">
-                    2
+                  {[...Array(totalPages)].map((_, i) => (
+                    <button
+                      key={i + 1}
+                      className={`flex h-8 w-8 items-center justify-center rounded-md border px-2 text-sm font-medium transition-all ${
+                        currentPage === i + 1
+                          ? "border-blue-500 bg-blue-500 text-white hover:bg-blue-600"
+                          : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                      }`}
+                      onClick={() => setCurrentPage(i + 1)}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50"
+                    disabled={currentPage === totalPages}
+                    onClick={() =>
+                      setCurrentPage((p) => Math.min(totalPages, p + 1))
+                    }
+                  >
+                    &gt;
                   </button>
-                  <button className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50">
-                    <ChevronDown className="h-4 w-4 -rotate-90" />
+                  <button
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-gray-200 bg-white text-gray-500 transition-colors hover:bg-gray-50"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(totalPages)}
+                  >
+                    &gt;&gt;
                   </button>
                 </div>
               </div>
@@ -880,7 +1190,7 @@ const ManageUsers = () => {
           {/* Biểu đồ */}
           <div
             ref={chartsRef}
-            className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2 opacity-0"
+            className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2 "
           >
             {/* Biểu đồ hoạt động người dùng */}
             <div
@@ -1120,6 +1430,65 @@ const ManageUsers = () => {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Vai trò
+                </label>
+                <div className="relative">
+                  <Shield className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <select
+                    name="role"
+                    value={formData.role}
+                    onChange={handleInputChange}
+                    className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                  >
+                    <option value="Học sinh">Học sinh</option>
+                    <option value="Quản trị viên">Quản trị viên</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Mật khẩu mới {formData.id ? "(không bắt buộc)" : "(bắt buộc)"}
+                </label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="password"
+                    name="password"
+                    value={formData.password}
+                    onChange={handleInputChange}
+                    className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                    placeholder={
+                      formData.id
+                        ? "Để trống nếu không đổi mật khẩu"
+                        : "Nhập mật khẩu"
+                    }
+                    required={!formData.id}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Xác nhận mật khẩu{" "}
+                  {formData.id ? "(không bắt buộc)" : "(bắt buộc)"}
+                </label>
+                <div className="relative">
+                  <Key className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <input
+                    type="password"
+                    name="confirmPassword"
+                    value={formData.confirmPassword}
+                    onChange={handleInputChange}
+                    className="w-full rounded-lg border border-gray-300 pl-10 pr-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                    placeholder="Xác nhận mật khẩu"
+                    required={!formData.id || formData.password.length > 0}
+                  />
+                </div>
+              </div>
+
               <div className="flex justify-end gap-4 pt-4">
                 <button
                   type="button"
@@ -1136,6 +1505,39 @@ const ManageUsers = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Xác nhận xóa người dùng */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
+          <div className="m-4 w-full max-w-md animate-fade-in rounded-xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
+                <AlertTriangle className="h-8 w-8 text-red-600" />
+              </div>
+            </div>
+            <h3 className="mb-2 text-center text-xl font-bold text-gray-800">
+              Xác nhận xóa người dùng
+            </h3>
+            <p className="mb-6 text-center text-gray-600">
+              Bạn có chắc chắn muốn xóa người dùng này không? Hành động này
+              không thể hoàn tác.
+            </p>
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
+              >
+                Xác nhận xóa
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1404,48 +1806,14 @@ const ManageUsers = () => {
         </div>
       )}
 
-      {/* Confirm Delete Modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm">
-          <div className="m-4 w-full max-w-md animate-fade-in rounded-xl bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-red-100">
-                <AlertTriangle className="h-8 w-8 text-red-600" />
-              </div>
-            </div>
-            <h3 className="mb-2 text-center text-xl font-bold text-gray-800">
-              Xác nhận xóa người dùng
-            </h3>
-            <p className="mb-6 text-center text-gray-600">
-              Bạn có chắc chắn muốn xóa người dùng này không? Hành động này
-              không thể hoàn tác.
-            </p>
-            <div className="flex justify-center gap-4">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="rounded-lg bg-gray-100 px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={handleDeleteUser}
-                className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
-              >
-                Xác nhận xóa
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Notification */}
       {showNotification && (
         <div
-          className={`fixed bottom-4 right-4 z-50 flex items-center rounded-lg p-4 shadow-lg transition-all duration-300 ${
+          className={`fixed bottom-4 right-4 z-50 flex items-center rounded-lg p-4 shadow-xl transition-all duration-500 animate-slide-up ${
             notificationType === "success" ? "bg-green-600" : "bg-red-600"
           }`}
         >
-          <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-white">
+          <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-full bg-white animate-pulse">
             {notificationType === "success" ? (
               <CheckCircle className="h-5 w-5 text-green-600" />
             ) : (
@@ -1453,41 +1821,52 @@ const ManageUsers = () => {
             )}
           </div>
           <p className="text-white">{notificationMessage}</p>
+          <button
+            onClick={() => setShowNotification(false)}
+            className="ml-4 text-white/80 hover:text-white"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
-      {/* Global CSS for animations */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        .animate-fade-in {
-          animation: fadeIn 0.3s ease-out forwards;
-        }
-
-        .animate-fade-in-up {
-          animation: fadeInUp 0.5s ease-out forwards;
-        }
-      `}</style>
+      {/* Thêm hiệu ứng mới vào CSS */}
+      <style>
+        {`
+    /* ... các animation hiện có ... */
+    
+    @keyframes slide-up {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    .animate-slide-up {
+      animation: slide-up 0.5s ease-out forwards;
+    }
+    
+    @keyframes pulse {
+      0% {
+        transform: scale(1);
+      }
+      50% {
+        transform: scale(1.05);
+      }
+      100% {
+        transform: scale(1);
+      }
+    }
+    
+    .animate-pulse {
+      animation: pulse 1.5s infinite;
+    }
+  `}
+      </style>
     </div>
   );
 };

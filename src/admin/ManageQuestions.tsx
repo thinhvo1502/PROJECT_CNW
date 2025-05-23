@@ -25,7 +25,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 
-const API_URL = "https://e5b7-116-110-41-31.ngrok-free.app/api/questions";
+const API_URL = " https://437f-113-161-89-176.ngrok-free.app/api/questions";
 const PAGE_SIZE = 10;
 
 // Map English difficulty names to Vietnamese and vice versa
@@ -38,7 +38,25 @@ const difficultyMap = {
 const vietnameseToEnglishDifficultyMap = Object.fromEntries(
   Object.entries(difficultyMap).map(([k, v]) => [v, k])
 );
+const getAuthToken = () => {
+  // Kiểm tra token trong localStorage
+  const token = localStorage.getItem("auth_token");
 
+  // Nếu không có token trong localStorage, kiểm tra trong cookies
+  if (!token) {
+    // Hàm lấy cookie theo tên
+    const getCookie = (name) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop().split(";").shift();
+      return null;
+    };
+
+    return getCookie("auth_token");
+  }
+
+  return token;
+};
 const ManageQuestions = () => {
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,6 +79,9 @@ const ManageQuestions = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [topicIdMap, setTopicIdMap] = useState(new Map());
+  const [tagsData, setTagsData] = useState([]);
+  const [loadingAction, setLoadingAction] = useState("");
+  const [failedActions, setFailedActions] = useState({});
   const [formData, setFormData] = useState({
     content: "",
     topic: "",
@@ -74,6 +95,7 @@ const ManageQuestions = () => {
   });
 
   // Fetch all topics and difficulties from API only
+  // Thêm vào useEffect ban đầu
   useEffect(() => {
     const fetchAllQuestions = async () => {
       try {
@@ -141,6 +163,9 @@ const ManageQuestions = () => {
             difficulty: difficultiesArray[0],
           }));
         }
+
+        // Thêm gọi API để lấy tags data
+        fetchTagsData();
       } catch (error) {
         console.error("Error fetching metadata:", error);
         setTopics(["Tất cả"]);
@@ -172,9 +197,12 @@ const ManageQuestions = () => {
         params.append("topic", topicId);
       }
 
+      const token = getAuthToken();
+
       const response = await axios.get(`${API_URL}?${params.toString()}`, {
         headers: {
           "ngrok-skip-browser-warning": "true",
+          Authorization: token ? `Bearer ${token}` : undefined,
         },
       });
       const data = response.data.data || [];
@@ -219,7 +247,61 @@ const ManageQuestions = () => {
       correctAnswer: String.fromCharCode(65 + (i % 4)), // A, B, C, or D
     }));
   };
+  // Thêm hàm fetch tags
+  const fetchTagsData = async () => {
+    try {
+      const token = getAuthToken();
 
+      const response = await axios.get(
+        "https://437f-113-161-89-176.ngrok-free.app/api/tags",
+        {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            Authorization: token ? `Bearer ${token}` : undefined,
+          },
+        }
+      );
+
+      if (response.data && Array.isArray(response.data.data)) {
+        setTagsData(response.data.data);
+      } else {
+        console.error("Unexpected tags data format:", response.data);
+        setTagsData([]);
+      }
+    } catch (error) {
+      console.error("Error fetching tags:", error);
+      setTagsData([]);
+    }
+  };
+  // Thêm hàm helper để tìm tag phù hợp với topic
+  const findTagForQuestion = (question) => {
+    if (!question || !question.topic || tagsData.length === 0) return null;
+
+    let questionTopicId = "";
+
+    // Lấy topic ID từ câu hỏi
+    if (typeof question.topic === "object" && question.topic !== null) {
+      questionTopicId = question.topic._id || question.topic.id;
+    } else {
+      // Nếu topic là string, có thể đó là ID hoặc tên
+      // Kiểm tra xem nó có phải là ID trong map không
+      for (const [name, id] of topicIdMap.entries()) {
+        if (question.topic === name || question.topic === id) {
+          questionTopicId = id;
+          break;
+        }
+      }
+
+      // Nếu không tìm thấy, dùng giá trị gốc
+      if (!questionTopicId) {
+        questionTopicId = question.topic;
+      }
+    }
+
+    // Tìm tag có topic trùng với topic của câu hỏi
+    const matchingTag = tagsData.find((tag) => tag.topic === questionTopicId);
+    return matchingTag ? matchingTag.description : null;
+  };
   useEffect(() => {
     fetchQuestions();
     // eslint-disable-next-line
@@ -250,10 +332,14 @@ const ManageQuestions = () => {
   };
 
   const handleOptionChange = (index, field, value) => {
+    console.log(`Changing ${field} for option ${index} to:`, value);
+
     const newOptions = [...formData.options];
     newOptions[index] = { ...newOptions[index], [field]: value };
 
+    // Đảm bảo chỉ có một đáp án được chọn là đúng
     if (field === "isCorrect" && value === true) {
+      console.log("Setting other options to false");
       newOptions.forEach((option, i) => {
         if (i !== index) {
           newOptions[i] = { ...newOptions[i], isCorrect: false };
@@ -261,16 +347,171 @@ const ManageQuestions = () => {
       });
     }
 
-    setFormData((prev) => ({ ...prev, options: newOptions }));
+    setFormData((prev) => {
+      const updated = { ...prev, options: newOptions };
+      console.log("Updated formData:", updated);
+      return updated;
+    });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    handleCancel();
-    showNotificationMessage(
-      "Chức năng này cần kết nối API để lưu dữ liệu!",
-      "error"
-    );
+    setIsLoading(true);
+    showNotificationMessage("Đang xử lý...", "info");
+    try {
+      // Thêm debug để kiểm tra các options
+      console.log("Options trước khi submit:", formData.options);
+
+      // Sửa đoạn code lấy correctAnswer trong hàm handleSubmit
+      const correctOptionIndex = formData.options.findIndex(
+        (opt) => opt.isCorrect === true
+      );
+      console.log("correctOptionIndex:", correctOptionIndex);
+
+      // Thêm logging để debug
+      console.log("Option được chọn:", formData.options[correctOptionIndex]);
+
+      const correctAnswer =
+        correctOptionIndex >= 0
+          ? formData.options[correctOptionIndex].id ||
+            formData.options[correctOptionIndex].label ||
+            String.fromCharCode(65 + correctOptionIndex) // Tạo ID (A, B, C, D) nếu không có
+          : null;
+      console.log("correctAnswer:", correctAnswer);
+
+      // Kiểm tra xem đã chọn đáp án đúng chưa
+      if (!correctAnswer) {
+        showNotificationMessage("Vui lòng chọn một đáp án đúng!", "error");
+        setIsLoading(false);
+        return;
+      }
+
+      const validatedOptions = formData.options.map((opt, idx) => ({
+        ...opt,
+        id: opt.id || opt.label || String.fromCharCode(65 + idx),
+      }));
+
+      // Chuyển đổi các giá trị sang định dạng API
+      const apiDifficulty =
+        vietnameseToEnglishDifficultyMap[formData.difficulty] ||
+        formData.difficulty;
+      const topicId = topicIdMap.get(formData.topic) || formData.topic;
+
+      // Thay thế đoạn code tạo apiData trong hàm handleSubmit
+      const apiData = {
+        content: formData.content,
+        topic: topicId, // Giữ nguyên - Đã đúng
+        difficulty: apiDifficulty, // Giữ nguyên - Đã đúng
+        // Sửa đổi options để chỉ giữ label và text
+        options: validatedOptions.map((opt) => ({
+          label: opt.id, // Chỉ sử dụng label thay vì id và label
+          text: opt.text,
+          // Không thêm _id vào
+        })),
+        correctAnswer: correctAnswer,
+      };
+
+      console.log("Dữ liệu gửi đi:", apiData);
+
+      // Lấy token xác thực
+      const token = getAuthToken();
+
+      if (!token) {
+        showNotificationMessage(
+          "Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại",
+          "error"
+        );
+        setIsLoading(false);
+        return;
+      }
+      let response;
+      // Cập nhật câu hỏi hiện có
+      if (formData.id) {
+        // Cập nhật câu hỏi hiện có
+        const apiUrl = `https://437f-113-161-89-176.ngrok-free.app/api/questions/${formData.id}`;
+
+        // In ra URL và dữ liệu gửi đi
+        console.log("Request URL:", apiUrl);
+        console.log("Request data:", JSON.stringify(apiData, null, 2));
+
+        response = await axios.put(apiUrl, apiData, {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        console.log("Cập nhật thành công:", response.data);
+
+        // Cập nhật câu hỏi trong state
+        setQuestions((prevQuestions) =>
+          prevQuestions.map((q) =>
+            q.id === formData.id || q._id === formData.id
+              ? {
+                  ...q,
+                  content: formData.content,
+                  difficulty: apiDifficulty,
+                  topic: formData.topic,
+                  options: formData.options,
+                  correctAnswer: correctAnswer,
+                }
+              : q
+          )
+        );
+
+        showNotificationMessage(
+          "Câu hỏi đã được cập nhật thành công!",
+          "success"
+        );
+      } else {
+        // Thêm câu hỏi mới
+        const apiUrl =
+          "https://d97a-113-161-89-176.ngrok-free.app/api/questions";
+        const response = await axios.post(apiUrl, apiData, {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`, // Thêm authorization header
+          },
+        });
+
+        console.log("Thêm mới thành công:", response.data);
+
+        // Thêm câu hỏi mới vào danh sách
+        setQuestions((prevQuestions) => [response.data, ...prevQuestions]);
+        showNotificationMessage(
+          "Câu hỏi mới đã được thêm thành công!",
+          "success"
+        );
+      }
+
+      // Đóng form
+      handleCancel();
+
+      // Tải lại dữ liệu để đảm bảo hiển thị chính xác
+      await fetchQuestions();
+    } catch (error) {
+      console.error("Lỗi khi lưu câu hỏi:", error);
+
+      // Thêm đoạn debug chi tiết ở đây
+      if (error.response) {
+        console.error("Chi tiết lỗi từ API:", {
+          status: error.response.status,
+          statusText: error.response.statusText,
+          data: error.response.data,
+        });
+      }
+
+      showNotificationMessage(
+        `Lỗi khi lưu câu hỏi: ${
+          error.response?.data?.message || error.message
+        }`,
+        "error"
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSearch = useCallback(
@@ -286,19 +527,161 @@ const ManageQuestions = () => {
     setShowDeleteConfirm(true);
   };
 
-  const handleDeleteQuestion = () => {
-    setShowDeleteConfirm(false);
-    showNotificationMessage(
-      "Chức năng này cần kết nối API để xóa dữ liệu!",
-      "error"
-    );
-  };
+  const handleDeleteQuestion = async () => {
+    setLoadingAction("delete-" + questionToDelete);
+    if (!questionToDelete) {
+      setShowDeleteConfirm(false);
+      return;
+    }
 
+    setIsLoading(true);
+
+    try {
+      const apiUrl = `https://437f-113-161-89-176.ngrok-free.app/api/questions/${questionToDelete}`;
+      console.log(`Đang gửi yêu cầu xóa câu hỏi với ID: ${questionToDelete}`);
+
+      const token = getAuthToken();
+
+      // Sử dụng DELETE thay vì PATCH
+      await axios.delete(apiUrl, {
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Cập nhật UI
+      setQuestions((prevQuestions) =>
+        prevQuestions.filter(
+          (q) => q.id !== questionToDelete && q._id !== questionToDelete
+        )
+      );
+
+      showNotificationMessage("Câu hỏi đã được xóa thành công!", "success");
+
+      // Đóng dialog
+      setShowDeleteConfirm(false);
+      setQuestionToDelete(null);
+    } catch (error) {
+      console.error("Lỗi khi xóa câu hỏi:", error);
+
+      // Hiển thị chi tiết lỗi
+      if (error.response) {
+        console.error("Chi tiết lỗi từ API:", {
+          status: error.response.status,
+          data: error.response.data,
+        });
+
+        if (error.response.status === 404) {
+          // Nếu không tìm thấy câu hỏi (404), có thể đã bị xóa rồi
+          showNotificationMessage(
+            "Câu hỏi này có thể đã bị xóa hoặc không tồn tại.",
+            "error"
+          );
+
+          // Cập nhật UI để loại bỏ câu hỏi nếu vẫn còn trong danh sách
+          setQuestions((prevQuestions) =>
+            prevQuestions.filter(
+              (q) => q.id !== questionToDelete && q._id !== questionToDelete
+            )
+          );
+
+          // Đóng dialog
+          setShowDeleteConfirm(false);
+          setQuestionToDelete(null);
+        } else if (error.response.status === 403) {
+          // Nếu không có quyền xóa
+          showNotificationMessage(
+            "Bạn không có quyền xóa câu hỏi này.",
+            "error"
+          );
+        } else {
+          // Các lỗi khác
+          showNotificationMessage(
+            `Lỗi khi xóa câu hỏi: ${
+              error.response.data?.message || error.message
+            }`,
+            "error"
+          );
+        }
+      } else {
+        showNotificationMessage(`Lỗi kết nối: ${error.message}`, "error");
+      }
+
+      // Đóng dialog trong trường hợp lỗi 404
+      if (error.response && error.response.status === 404) {
+        setShowDeleteConfirm(false);
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  const handleDeactivateQuestion = async (id) => {
+    try {
+      const apiUrl = `https://20d2-116-110-41-31.ngrok-free.app/api/questions/${id}`;
+      const token = getAuthToken();
+
+      // Gọi PATCH để cập nhật trạng thái thay vì DELETE
+      await axios.patch(
+        apiUrl,
+        { isActive: false },
+        {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // Cập nhật giao diện tương tự như khi xóa
+      setQuestions((prevQuestions) =>
+        prevQuestions.filter((q) => q.id !== id && q._id !== id)
+      );
+
+      showNotificationMessage(
+        "Câu hỏi đã được vô hiệu hóa thành công!",
+        "success"
+      );
+    } catch (error) {
+      console.error("Lỗi khi vô hiệu hóa câu hỏi:", error);
+      showNotificationMessage(
+        `Lỗi khi vô hiệu hóa câu hỏi: ${error.message}`,
+        "error"
+      );
+    }
+  };
   const handleEditQuestion = (id) => {
+    setLoadingAction("edit-" + id);
     const questionToEdit = questions.find(
       (question) => question.id === id || question._id === id
     );
+
     if (questionToEdit) {
+      // Chuẩn bị options và đánh dấu đáp án đúng
+      let options = [];
+
+      // Thay thế đoạn code chuẩn bị options trong handleEditQuestion
+      if (Array.isArray(questionToEdit.options)) {
+        options = questionToEdit.options.map((opt, idx) => {
+          // Đảm bảo mỗi option đều có id
+          const id = opt.id || opt.label || String.fromCharCode(65 + idx);
+          // Đánh dấu đáp án đúng dựa vào correctAnswer
+          const isCorrect =
+            id === questionToEdit.correctAnswer ||
+            opt.label === questionToEdit.correctAnswer;
+          return { ...opt, id, isCorrect };
+        });
+      } else {
+        options = [
+          { id: "A", text: "", isCorrect: false },
+          { id: "B", text: "", isCorrect: false },
+          { id: "C", text: "", isCorrect: false },
+          { id: "D", text: "", isCorrect: false },
+        ];
+      }
+
       setFormData({
         id: questionToEdit.id || questionToEdit._id,
         content: questionToEdit.content,
@@ -314,15 +697,9 @@ const ManageQuestions = () => {
               questionToEdit.difficulty.name
             : difficultyMap[questionToEdit.difficulty] ||
               questionToEdit.difficulty,
-        options: Array.isArray(questionToEdit.options)
-          ? [...questionToEdit.options]
-          : [
-              { id: "A", text: "", isCorrect: false },
-              { id: "B", text: "", isCorrect: false },
-              { id: "C", text: "", isCorrect: false },
-              { id: "D", text: "", isCorrect: false },
-            ],
+        options: options,
       });
+
       setShowForm(true);
     }
   };
@@ -672,6 +1049,7 @@ const ManageQuestions = () => {
                       Nội dung
                     </th>
                     <th className="px-6 py-4 text-left font-medium">Chủ đề</th>
+                    <th className="px-6 py-4 text-left font-medium">Tags</th>
                     <th className="px-6 py-4 text-left font-medium">Mức độ</th>
                     <th className="px-6 py-4 text-left font-medium">
                       Đáp án đúng
@@ -700,6 +1078,8 @@ const ManageQuestions = () => {
                         typeof question.content === "string"
                           ? question.content
                           : question.content?.name || "";
+                      const tagDescription = findTagForQuestion(question);
+
                       return (
                         <tr
                           key={question.id || question._id || index}
@@ -716,6 +1096,19 @@ const ManageQuestions = () => {
                               : content}
                           </td>
                           <td className="px-6 py-4 text-gray-800">{topic}</td>
+                          <td className="px-6 py-4 text-gray-600">
+                            {tagDescription ? (
+                              <span className="inline-flex rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800">
+                                {tagDescription.length > 30
+                                  ? `${tagDescription.substring(0, 30)}...`
+                                  : tagDescription}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">
+                                Không có tag
+                              </span>
+                            )}
+                          </td>
                           <td className="px-6 py-4">
                             <span
                               className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
@@ -740,11 +1133,14 @@ const ManageQuestions = () => {
                                 ) {
                                   const correct = question.options.find(
                                     (opt) =>
+                                      opt.id === question.correctAnswer ||
                                       opt.label === question.correctAnswer
                                   );
                                   return correct
-                                    ? `${correct.label}: ${correct.text}`
-                                    : "N/A";
+                                    ? `${correct.id || correct.label}: ${
+                                        correct.text
+                                      }`
+                                    : question.correctAnswer;
                                 }
                                 return "N/A";
                               })()}
@@ -753,26 +1149,60 @@ const ManageQuestions = () => {
                           <td className="px-6 py-4">
                             <div className="flex flex-wrap gap-2">
                               <button
-                                onClick={() =>
+                                className={`rounded-lg bg-blue-100 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-200 ${
+                                  isLoading &&
+                                  loadingAction === "edit" &&
+                                  loadingAction === question.id
+                                    ? "opacity-50 cursor-wait"
+                                    : ""
+                                }`}
+                                onClick={() => {
+                                  setLoadingAction(
+                                    "edit-" + (question.id || question._id)
+                                  );
                                   handleEditQuestion(
-                                    question.id || question._id || index
-                                  )
-                                }
-                                className="flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-600 transition-all duration-300 hover:bg-blue-100 hover:scale-105"
+                                    question.id || question._id
+                                  );
+                                }}
+                                disabled={isLoading}
+                                title="Sửa"
                               >
-                                <Edit className="mr-1.5 h-4 w-4" />
-                                Sửa
+                                {isLoading &&
+                                loadingAction ===
+                                  "edit-" + (question.id || question._id) ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
+                                ) : (
+                                  <Edit className="h-4 w-4" />
+                                )}
+                                <span className="sr-only">Sửa</span>
                               </button>
                               <button
-                                onClick={() =>
+                                className={`rounded-lg bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-200 ${
+                                  isLoading &&
+                                  loadingAction ===
+                                    "delete-" + (question.id || question._id)
+                                    ? "opacity-50 cursor-wait"
+                                    : ""
+                                }`}
+                                onClick={() => {
+                                  setLoadingAction(
+                                    "delete-" + (question.id || question._id)
+                                  );
                                   confirmDeleteQuestion(
-                                    question.id || question._id || index
-                                  )
-                                }
-                                className="flex items-center rounded-lg bg-red-50 px-3 py-1.5 text-sm font-medium text-red-600 transition-all duration-300 hover:bg-red-100 hover:scale-105"
+                                    question.id || question._id
+                                  );
+                                }}
+                                disabled={isLoading}
+                                title="Xóa"
                               >
-                                <Trash2 className="mr-1.5 h-4 w-4" />
-                                Xóa
+                                {isLoading &&
+                                loadingAction ===
+                                  "delete-" + (question.id || question._id) ? (
+                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent"></div>
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                                <span className="sr-only">Xóa</span>
                               </button>
                             </div>
                           </td>
@@ -782,7 +1212,7 @@ const ManageQuestions = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={6}
+                        colSpan={7} // Tăng số cột lên 7
                         className="px-6 py-8 text-center text-gray-500"
                       >
                         Không tìm thấy câu hỏi nào phù hợp
@@ -858,7 +1288,7 @@ const ManageQuestions = () => {
 
                 {pages.map((page) => (
                   <button
-                    key={page}
+                    key={`page-${page}`}
                     className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-all ${
                       currentPage === page
                         ? "border-blue-500 bg-blue-500 text-white hover:bg-blue-600"
@@ -1163,18 +1593,42 @@ const ManageQuestions = () => {
                 <div className="space-y-4">
                   {formData.options.map((option, index) => (
                     <div
-                      key={option.id}
-                      className="flex items-start space-x-4 rounded-lg border border-gray-200 p-4 transition-all hover:bg-blue-50/30"
+                      key={`option-${option.id || index}`} // Thêm index để tránh trùng lặp key
+                      className={`flex items-start space-x-4 rounded-lg border p-4 transition-all ${
+                        option.isCorrect
+                          ? "border-green-300 bg-green-50/50"
+                          : "border-gray-200 hover:bg-blue-50/30"
+                      }`}
                     >
                       <div className="flex h-10 items-center mt-1">
                         <input
                           type="radio"
-                          id={`correct-${index}`}
+                          id={`correct-${option.id}`} // Đổi tên id để tránh xung đột
                           name="correctOption"
-                          checked={option.isCorrect}
-                          onChange={() =>
-                            handleOptionChange(index, "isCorrect", true)
-                          }
+                          checked={option.isCorrect === true} // Sử dụng so sánh chính xác
+                          onChange={() => {
+                            // In ra debug trước khi thay đổi
+                            console.log(
+                              "Trước khi chọn:",
+                              formData.options.map((o) => ({
+                                id: o.id,
+                                isCorrect: o.isCorrect,
+                              }))
+                            );
+                            handleOptionChange(index, "isCorrect", true);
+                            // In ra debug sau khi thay đổi
+                            setTimeout(
+                              () =>
+                                console.log(
+                                  "Sau khi chọn:",
+                                  formData.options.map((o) => ({
+                                    id: o.id,
+                                    isCorrect: o.isCorrect,
+                                  }))
+                                ),
+                              0
+                            );
+                          }}
                           className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
                         />
                       </div>
@@ -1185,7 +1639,7 @@ const ManageQuestions = () => {
                           </span>
                           <input
                             type="text"
-                            value={option.text}
+                            value={option.text || ""}
                             onChange={(e) =>
                               handleOptionChange(index, "text", e.target.value)
                             }
@@ -1308,8 +1762,16 @@ const ManageQuestions = () => {
               <button
                 onClick={handleDeleteQuestion}
                 className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-red-700"
+                disabled={isLoading}
               >
-                Xác nhận xóa
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-t-transparent border-white"></div>
+                    Đang xử lý...
+                  </div>
+                ) : (
+                  "Xác nhận xóa"
+                )}
               </button>
             </div>
           </div>

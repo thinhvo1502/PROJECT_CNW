@@ -1,6 +1,9 @@
 "use client";
+import axios from "axios";
 import { Link } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
+import api from "../utils/api";
+import { getCookie } from "../utils/cookies";
 import {
   XAxis,
   YAxis,
@@ -44,7 +47,7 @@ import {
   Star,
   Info,
 } from "lucide-react";
-
+const API_BASE_URL = "https://437f-113-161-89-176.ngrok-free.app";
 const attemptsData = [
   { name: "Tháng 1", "Thống Kê Lượt Làm Bài": 120 },
   { name: "Tháng 2", "Thống Kê Lượt Làm Bài": 150 },
@@ -417,6 +420,9 @@ const sampleQuestions = {
 };
 
 const ManageExams = () => {
+  const getAuthToken = () => {
+    return localStorage.getItem("auth_token");
+  };
   const [showForm, setShowForm] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -433,65 +439,19 @@ const ManageExams = () => {
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [questionSearchTerm, setQuestionSearchTerm] = useState("");
   const [selectedDifficulty, setSelectedDifficulty] = useState("Tất cả");
-
-  // Refs for scroll animations
+  const [exams, setExams] = useState([]);
+  const [topics, setTopics] = useState([]);
   const tableRef = useRef(null);
   const chartsRef = useRef(null);
-
-  const [exams, setExams] = useState([
-    {
-      id: 1,
-      name: "Cơ sở dữ liệu",
-      topic: "Cơ sở dữ liệu",
-      questions: 50,
-      difficulty: "Trung bình",
-      date: "01/01/2025",
-      price: 50000,
-      avgScore: 7.5,
-      completions: 120,
-      rating: 4.8,
-    },
-    {
-      id: 2,
-      name: "Cấu Trúc Dữ Liệu",
-      topic: "Kỹ thuật lập trình",
-      questions: 40,
-      difficulty: "Khó",
-      date: "15/02/2025",
-      price: 45000,
-      avgScore: 6.8,
-      completions: 85,
-      rating: 4.2,
-    },
-    {
-      id: 3,
-      name: "Lập trình hướng đối tượng",
-      topic: "Kỹ thuật lập trình",
-      questions: 45,
-      difficulty: "Dễ",
-      date: "20/02/2025",
-      price: 0,
-      avgScore: 8.2,
-      completions: 150,
-      rating: 4.9,
-    },
-    {
-      id: 4,
-      name: "Mạng máy tính",
-      topic: "Mạng máy tính",
-      questions: 60,
-      difficulty: "Khó",
-      date: "05/03/2025",
-      price: 60000,
-      avgScore: 7.0,
-      completions: 95,
-      rating: 4.5,
-    },
-  ]);
-
+  const [users, setUsers] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const PAGE_SIZE = 10; // Số lượng đề thi mỗi trang
+  const [loadingAction, setLoadingAction] = useState("");
   const [formData, setFormData] = useState({
     name: "",
-    topic: "",
+    topicId: "", // Lưu ID của topic
+    topicName: "", // Lưu tên hiển thị
     questions: "",
     difficulty: difficultyLevels[0],
     price: "0",
@@ -500,65 +460,131 @@ const ManageExams = () => {
     file: null,
     selectedQuestions: [],
   });
+  // Thêm console.log kiểm tra filteredUsers
+  const filteredUsers = users.filter((user) => {
+    const searchRegex = new RegExp(searchTerm, "i");
+    return (
+      searchRegex.test(user.name) ||
+      searchRegex.test(user.email) ||
+      searchRegex.test(user.role || "")
+    );
+  });
 
-  useEffect(() => {
-    // Simulate loading
-    const timer = setTimeout(() => {
-      setIsLoading(false);
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
 
-      // Trigger stats animation after loading
-      setTimeout(() => {
-        setAnimateStats(true);
-      }, 300);
-    }, 800);
+      // Kiểm tra token từ cả cookie và localStorage
+      const cookieToken = getCookie("auth_token");
+      const localToken = localStorage.getItem("auth_token");
 
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Scroll animation observer
-  useEffect(() => {
-    if (!isLoading) {
-      const observer = new IntersectionObserver(
-        (entries) => {
-          entries.forEach((entry) => {
-            if (entry.isIntersecting) {
-              if (entry.target === tableRef.current) {
-                entry.target.classList.add("animate-fade-in-up");
-              } else if (entry.target === chartsRef.current) {
-                entry.target.classList.add("animate-fade-in-up");
-              }
-            }
-          });
-        },
-        { threshold: 0.1 }
+      // Log để kiểm tra token
+      console.log("Tokens available for user request:");
+      console.log(
+        "- Cookie:",
+        cookieToken ? `${cookieToken.substring(0, 15)}...` : "None"
+      );
+      console.log(
+        "- LocalStorage:",
+        localToken ? `${localToken.substring(0, 15)}...` : "None"
       );
 
-      if (tableRef.current) observer.observe(tableRef.current);
-      if (chartsRef.current) observer.observe(chartsRef.current);
+      // Nếu không có token, chuyển hướng đến trang đăng nhập
+      if (!cookieToken && !localToken) {
+        console.error("No token available - redirecting to login");
+        window.location.href = "/login";
+        return;
+      }
 
-      return () => {
-        if (tableRef.current) observer.unobserve(tableRef.current);
-        if (chartsRef.current) observer.unobserve(chartsRef.current);
-      };
+      const response = await api.get("/users");
+      console.log("API response:", response.data);
+
+      // Xử lý response đúng cấu trúc API
+      if (
+        response.data &&
+        response.data.success &&
+        Array.isArray(response.data.data)
+      ) {
+        setUsers(response.data.data);
+        console.log("Users loaded:", response.data.data.length);
+      } else {
+        console.error("Unexpected API response format", response.data);
+        setUsers([]);
+      }
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      setUsers([]);
+    } finally {
+      setIsLoading(false);
     }
-  }, [isLoading]);
+  };
 
-  // Cập nhật danh sách câu hỏi khi chọn chủ đề
+  // Thay đổi URL API và cập nhật logic để lấy danh sách chủ đề
+  // Cập nhật hàm fetchExams để chuyển đổi dữ liệu
   useEffect(() => {
-    if (formData.topic) {
-      setAvailableQuestions(sampleQuestions[formData.topic] || []);
-      setSelectedQuestions([]);
-    } else {
-      setAvailableQuestions([]);
-      setSelectedQuestions([]);
-    }
-  }, [formData.topic]);
+    fetchExams();
+  }, [currentPage]);
+  const fetchExams = async () => {
+    setIsLoading(true);
+    try {
+      // Lấy dữ liệu từ API với param phân trang
+      const response = await axios.get(
+        `https://437f-113-161-89-176.ngrok-free.app/api/exams`,
+        {
+          params: {
+            page: currentPage,
+            limit: PAGE_SIZE,
+          },
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+          },
+        }
+      );
 
+      console.log("API response:", response.data);
+
+      // Lấy dữ liệu exams từ response
+      const examsData = response.data.data || response.data.exams || [];
+      const totalCount = response.data.total || examsData.length;
+
+      // Tính toán tổng số trang
+      setTotalPages(Math.ceil(totalCount / PAGE_SIZE));
+
+      // Chuyển đổi dữ liệu để phù hợp với định dạng hiển thị
+      const formattedExams = examsData.map((exam) => ({
+        id: exam._id || exam.id,
+        name: exam.title || exam.name,
+        topic: exam.topic?.name || "Chưa phân loại",
+        questions:
+          exam.questionCount || (exam.questions ? exam.questions.length : 0),
+        difficulty: exam.difficulty || "unknown",
+        date: new Date(exam.createdAt).toLocaleDateString("vi-VN"),
+        avgScore: exam.stats?.averageScore || 0,
+        completions: exam.stats?.totalAttempts || 0,
+        accessLevel: exam.accessLevel || "free",
+        rating: exam.rating || 0, // Thêm trường rating với giá trị mặc định là 0
+      }));
+
+      setExams(formattedExams);
+
+      // Lấy danh sách chủ đề từ response nếu có
+      if (response.data.topics && Array.isArray(response.data.topics)) {
+        setTopics(response.data.topics);
+      }
+    } catch (error) {
+      console.error("Error fetching exams:", error);
+      setExams([]);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setAnimateStats(true), 300);
+    }
+  };
   const handleAddExam = () => {
     setShowForm(true);
     setFormData({
       name: "",
-      topic: "",
+      topicId: "",
+      topicName: "",
       questions: "",
       difficulty: difficultyLevels[0],
       price: "0",
@@ -579,18 +605,18 @@ const ManageExams = () => {
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    if (name === "isPaid") {
+    if (name === "topicId") {
+      // Tìm thông tin topic tương ứng để lưu tên
+      const selectedTopic = topics.find((topic) => topic._id === value);
       setFormData((prev) => ({
         ...prev,
-        [name]: checked,
-        price: checked ? prev.price : "0",
+        topicId: value,
+        topicName: selectedTopic ? selectedTopic.name : "",
       }));
+    } else if (name === "isPaid") {
+      // Code xử lý isPaid giữ nguyên
     } else if (type === "file") {
-      setFormData((prev) => ({
-        ...prev,
-        file: e.target.files[0],
-        fileName: e.target.files[0]?.name || "",
-      }));
+      // Code xử lý file giữ nguyên
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -620,86 +646,390 @@ const ManageExams = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Kiểm tra xem đã chọn đủ số câu hỏi chưa
-    const requiredQuestions = Number(formData.questions) || 0;
-    if (selectedQuestions.length < requiredQuestions) {
+    // Kiểm tra nếu số câu hỏi được chọn không khớp với số câu hỏi yêu cầu
+    if (parseInt(formData.questions) !== formData.selectedQuestions.length) {
       showNotificationMessage(
-        `Vui lòng chọn đủ ${requiredQuestions} câu hỏi (hiện tại: ${selectedQuestions.length})`,
+        `Vui lòng chọn đúng ${formData.questions} câu hỏi (hiện tại đã chọn ${formData.selectedQuestions.length} câu)`,
         "error"
       );
       return;
     }
 
-    const newExam = {
-      id: formData.id || Math.floor(Math.random() * 10000),
-      name: formData.name,
-      topic: formData.topic,
-      questions: Number(formData.questions),
-      difficulty: formData.difficulty,
-      date: new Date().toLocaleDateString("vi-VN"),
-      price: formData.isPaid ? Number(formData.price) : 0,
-      avgScore: formData.id
-        ? exams.find((e) => e.id === formData.id)?.avgScore || 0
-        : 0,
-      completions: formData.id
-        ? exams.find((e) => e.id === formData.id)?.completions || 0
-        : 0,
-      rating: formData.id
-        ? exams.find((e) => e.id === formData.id)?.rating || 0
-        : 0,
-      selectedQuestions: selectedQuestions,
-    };
+    setIsLoading(true);
+    setLoadingAction("update");
 
-    if (formData.id) {
-      // Update existing exam
-      setExams((prev) =>
-        prev.map((exam) => (exam.id === formData.id ? newExam : exam))
-      );
-      showNotificationMessage("Đã cập nhật đề thi thành công", "success");
-    } else {
-      // Add new exam
-      setExams((prev) => [...prev, newExam]);
-      showNotificationMessage("Đã thêm đề thi mới thành công", "success");
+    try {
+      // Chuẩn bị dữ liệu để gửi đi
+      const examData = {
+        title: formData.name,
+        topic: formData.topicId,
+        description: formData.examContent,
+        difficulty: formData.difficulty,
+        instructions: formData.instructions,
+        timeLimit: parseInt(formData.timeLimit),
+        accessLevel: formData.isPaid ? "premium" : "free",
+        questions: formData.selectedQuestions.map((q, index) => ({
+          question: q.id,
+          points: q.points || 1,
+          order: index + 1,
+        })),
+        isPublished: true,
+        allowReview: true,
+        randomizeQuestions: false,
+      };
+
+      console.log("Sending data:", examData);
+
+      let response;
+      const token = localStorage.getItem("auth_token");
+
+      if (formData.id) {
+        // Cập nhật đề thi hiện có
+        response = await axios.put(
+          `${API_BASE_URL}/api/exams/${formData.id}`,
+          examData,
+          {
+            headers: {
+              "ngrok-skip-browser-warning": "true",
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        showNotificationMessage("Đã cập nhật đề thi thành công!", "success");
+      } else {
+        // Thêm đề thi mới
+        response = await axios.post(`${API_BASE_URL}/api/exams`, examData, {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        showNotificationMessage("Đã thêm đề thi mới thành công!", "success");
+      }
+
+      console.log("Response:", response.data);
+
+      // Làm mới danh sách đề thi
+      await fetchExams();
+
+      // Đóng form
+      setShowForm(false);
+    } catch (error) {
+      console.error("Error saving exam:", error);
+
+      if (error.response) {
+        console.error("Error response data:", error.response.data);
+        showNotificationMessage(
+          `Lỗi: ${error.response.data.message || error.message}`,
+          "error"
+        );
+      } else {
+        showNotificationMessage(`Lỗi: ${error.message}`, "error");
+      }
+    } finally {
+      setIsLoading(false);
+      setLoadingAction("");
     }
-
-    handleCancel();
   };
 
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
   };
+  // Lọc câu hỏi theo từ khóa tìm kiếm và mức độ khó
+  const filteredTopicQuestions = useMemo(() => {
+    if (!formData.allTopicQuestions) return [];
 
+    return formData.allTopicQuestions.filter((q) => {
+      const matchesSearch = q.content
+        .toLowerCase()
+        .includes(questionSearchTerm.toLowerCase());
+      const matchesDifficulty =
+        selectedDifficulty === "Tất cả" || q.difficulty === selectedDifficulty;
+      return matchesSearch && matchesDifficulty;
+    });
+  }, [formData.allTopicQuestions, questionSearchTerm, selectedDifficulty]);
+
+  // Xử lý khi chọn/bỏ chọn câu hỏi
+  const handleQuestionSelection = (questionId) => {
+    setFormData((prevData) => {
+      const allQuestions = [...prevData.allTopicQuestions];
+      const questionIndex = allQuestions.findIndex((q) => q.id === questionId);
+
+      if (questionIndex === -1) return prevData;
+
+      // Toggle selection
+      allQuestions[questionIndex] = {
+        ...allQuestions[questionIndex],
+        isSelected: !allQuestions[questionIndex].isSelected,
+      };
+
+      // Update selectedQuestions
+      const selectedQuestions = allQuestions.filter((q) => q.isSelected);
+
+      return {
+        ...prevData,
+        allTopicQuestions: allQuestions,
+        selectedQuestions,
+      };
+    });
+  };
+
+  // Xử lý khi thay đổi điểm của câu hỏi
+  const handleQuestionPointsChange = (questionId, points) => {
+    setFormData((prevData) => {
+      const allQuestions = [...prevData.allTopicQuestions];
+      const questionIndex = allQuestions.findIndex((q) => q.id === questionId);
+
+      if (questionIndex === -1) return prevData;
+
+      allQuestions[questionIndex] = {
+        ...allQuestions[questionIndex],
+        points,
+      };
+
+      // Update selectedQuestions
+      const selectedQuestions = allQuestions.filter((q) => q.isSelected);
+
+      return {
+        ...prevData,
+        allTopicQuestions: allQuestions,
+        selectedQuestions,
+      };
+    });
+  };
+
+  // Xử lý khi thay đổi chủ đề
+  const handleTopicChange = async (e) => {
+    const { name, value } = e.target;
+
+    // Cập nhật topic
+    const [formData, setFormData] = useState({
+      name: "",
+      topicId: "",
+      topicName: "",
+      questions: "",
+      difficulty: difficultyLevels[0],
+      price: "0",
+      isPaid: false,
+      examContent: "",
+      file: null,
+      selectedQuestions: [],
+      allTopicQuestions: [], // Thêm trường này
+    });
+    if (value) {
+      try {
+        setIsLoading(true);
+        setLoadingAction("fetch-questions");
+
+        // Lấy tất cả câu hỏi theo chủ đề mới
+        const response = await axios.get(
+          `https://437f-113-161-89-176.ngrok-free.app/api/questions`,
+          {
+            params: {
+              topic: value,
+              limit: 100,
+            },
+            headers: {
+              "ngrok-skip-browser-warning": "true",
+              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            },
+          }
+        );
+
+        const questions = response.data.data || [];
+        console.log("Đã tải được câu hỏi:", questions.length);
+
+        const formattedQuestions = questions.map((q) => ({
+          id: q._id,
+          content: q.content || q.question || "Nội dung câu hỏi",
+          difficulty: q.difficulty || "easy",
+          isSelected: false,
+          points: 1,
+        }));
+
+        setFormData((prev) => ({
+          ...prev,
+          allTopicQuestions: formattedQuestions,
+        }));
+      } catch (error) {
+        console.error("Error fetching questions:", error);
+        showNotificationMessage(
+          `Lỗi khi tải câu hỏi: ${error.message}`,
+          "error"
+        );
+      } finally {
+        setIsLoading(false);
+        setLoadingAction("");
+      }
+    }
+  };
   const confirmDeleteExam = (id) => {
     setExamToDelete(id);
     setShowDeleteConfirm(true);
   };
 
-  const handleDeleteExam = () => {
-    setExams((prev) => prev.filter((exam) => exam.id !== examToDelete));
-    setShowDeleteConfirm(false);
-    showNotificationMessage("Đã xóa đề thi thành công", "success");
+  const handleDeleteUser = async () => {
+    setIsLoading(true);
+
+    try {
+      // Gửi DELETE request đến API
+      await api.delete(`/users/${userToDelete}`);
+
+      // Cập nhật UI (giữ lại cấu trúc mảng users)
+      setUsers((prev) =>
+        prev.filter(
+          (user) => user.id !== userToDelete && user._id !== userToDelete
+        )
+      );
+
+      showNotificationMessage("Đã xóa người dùng thành công", "success");
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      showNotificationMessage(
+        `Lỗi khi xóa người dùng: ${
+          error.response?.data?.message || error.message
+        }`,
+        "error"
+      );
+    } finally {
+      setIsLoading(false);
+      setShowDeleteConfirm(false);
+    }
   };
 
-  const handleEditExam = (id) => {
-    const examToEdit = exams.find((exam) => exam.id === id);
-    if (examToEdit) {
-      setFormData({
-        id: examToEdit.id,
-        name: examToEdit.name,
-        topic: examToEdit.topic,
-        questions: examToEdit.questions.toString(),
-        difficulty: examToEdit.difficulty,
-        price: examToEdit.price.toString(),
-        isPaid: examToEdit.price > 0,
-        examContent: "",
-        file: null,
+  const handleEditExam = async (examId) => {
+    try {
+      setIsLoading(true);
+      setLoadingAction("fetch-edit");
+
+      // Lấy thông tin chi tiết của đề thi
+      const examResponse = await axios.get(
+        `${API_BASE_URL}/api/exams/${examId}`,
+        {
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+          },
+        }
+      );
+
+      // Log ra cấu trúc đầy đủ để kiểm tra
+      console.log("Exam response:", examResponse);
+
+      // Kiểm tra cấu trúc dữ liệu của API
+      const examData = examResponse.data.data || examResponse.data;
+      console.log("Exam data:", examData);
+
+      // Kiểm tra và xác định topicId từ cấu trúc dữ liệu
+      let topicId;
+      let topicName = "Chưa phân loại";
+
+      // Log dữ liệu để debug
+      console.log("Topic data:", {
+        topicObject: examData.topic,
+        topicId: examData.topicId,
+        fullData: examData,
       });
-      setSelectedQuestions(examToEdit.selectedQuestions || []);
-      setAvailableQuestions(sampleQuestions[examToEdit.topic] || []);
+
+      // Xử lý nhiều trường hợp cấu trúc khác nhau
+      if (
+        examData.topic &&
+        typeof examData.topic === "object" &&
+        examData.topic._id
+      ) {
+        // Trường hợp topic là một object có _id
+        topicId = examData.topic._id;
+        topicName = examData.topic.name || topicName;
+      } else if (examData.topic && typeof examData.topic === "string") {
+        // Trường hợp topic là một string (ID)
+        topicId = examData.topic;
+      } else if (examData.topicId) {
+        // Trường hợp API trả về topicId trực tiếp
+        topicId = examData.topicId;
+        topicName = examData.topicName || topicName;
+      } else {
+        // Không tìm thấy thông tin topic - sử dụng giá trị mặc định
+        console.warn(
+          "Không tìm thấy thông tin chủ đề trong dữ liệu đề thi, sử dụng giá trị trống"
+        );
+        // Không ném lỗi nữa, chỉ ghi log cảnh báo
+      }
+
+      // Lấy tất cả câu hỏi cùng chủ đề
+      let allTopicQuestions = [];
+
+      if (topicId) {
+        try {
+          const questionsResponse = await axios.get(
+            `${API_BASE_URL}/api/questions`,
+            {
+              params: {
+                topic: topicId,
+                limit: 100, // Lấy nhiều câu hỏi để đảm bảo đủ
+              },
+              headers: {
+                "ngrok-skip-browser-warning": "true",
+                Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+              },
+            }
+          );
+          allTopicQuestions = questionsResponse.data.data || [];
+        } catch (error) {
+          console.error("Không thể tải câu hỏi cho chủ đề:", error);
+          // Không dừng luồng xử lý khi không thể tải câu hỏi
+        }
+      }
+
+      // Xác định câu hỏi nào đã được chọn trong đề thi
+      const examQuestions = examData.questions || [];
+      const examQuestionIds = examQuestions.map((q) =>
+        typeof q === "object" ? q.question || q._id : q
+      );
+
+      // Chuẩn bị danh sách câu hỏi với trạng thái đã chọn
+      const formattedQuestions = allTopicQuestions.map((q) => ({
+        id: q._id,
+        content: q.content || q.question || "Nội dung câu hỏi",
+        difficulty: q.difficulty || "easy",
+        isSelected: examQuestionIds.includes(q._id),
+        points: 1, // Điểm mặc định
+      }));
+
+      // Cập nhật form data với thông tin đề thi
+      setFormData({
+        id: examData._id || examData.id,
+        name: examData.title || examData.name,
+        topicId: topicId,
+        topicName: topicName,
+        questions: examQuestions.length.toString(),
+        difficulty: examData.difficulty || "easy",
+        price: examData.accessLevel === "premium" ? "10" : "0",
+        isPaid: examData.accessLevel === "premium",
+        examContent: examData.description || "",
+        timeLimit: examData.timeLimit?.toString() || "60",
+        instructions: examData.instructions || "",
+        file: null,
+        selectedQuestions: formattedQuestions.filter((q) => q.isSelected),
+        allTopicQuestions: formattedQuestions,
+      });
+
       setShowForm(true);
+    } catch (error) {
+      console.error("Error fetching exam details:", error);
+      showNotificationMessage(
+        `Lỗi khi tải thông tin đề thi: ${error.message}`,
+        "error"
+      );
+    } finally {
+      setIsLoading(false);
+      setLoadingAction("");
     }
   };
 
@@ -1074,7 +1404,7 @@ const ManageExams = () => {
           {/* Bảng danh sách đề kiểm tra */}
           <div
             ref={tableRef}
-            className="mb-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg transition-all duration-300 hover:shadow-xl opacity-0"
+            className="mb-8 overflow-hidden rounded-xl border border-gray-100 bg-white shadow-lg transition-all duration-300 hover:shadow-xl "
           >
             <div className="border-b p-6">
               <h2 className="text-lg font-semibold text-gray-800">
@@ -1096,15 +1426,10 @@ const ManageExams = () => {
                       Số câu hỏi
                     </th>
                     <th className="px-6 py-4 text-left font-medium">Mức độ</th>
-                    <th className="px-6 py-4 text-left font-medium">
-                      Lượt làm
-                    </th>
-                    <th className="px-6 py-4 text-left font-medium">
-                      Đánh giá
-                    </th>
+
                     <th className="px-6 py-4 text-left font-medium">Điểm TB</th>
                     <th className="px-6 py-4 text-left font-medium">
-                      Thành tiền
+                      Mức truy cập
                     </th>
                     <th className="px-6 py-4 text-left font-medium">
                       Hành động
@@ -1135,29 +1460,26 @@ const ManageExams = () => {
                         <td className="px-6 py-4">
                           <span
                             className={`inline-flex rounded-full px-2 py-1 text-xs font-medium ${
-                              exam.difficulty === "Dễ"
+                              exam.difficulty === "easy"
                                 ? "bg-green-100 text-green-800"
-                                : exam.difficulty === "Trung bình"
+                                : exam.difficulty === "medium"
                                 ? "bg-blue-100 text-blue-800"
-                                : exam.difficulty === "Khó"
+                                : exam.difficulty === "hard"
                                 ? "bg-orange-100 text-orange-800"
                                 : "bg-red-100 text-red-800"
                             }`}
                           >
-                            {exam.difficulty}
+                            {exam.difficulty === "easy"
+                              ? "Easy"
+                              : exam.difficulty === "medium"
+                              ? "Medium"
+                              : exam.difficulty === "hard"
+                              ? "Hard"
+                              : "Very Hard"}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-gray-800">
-                          {exam.completions}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center">
-                            <span className="mr-1 font-medium text-gray-800">
-                              {exam.rating.toFixed(1)}
-                            </span>
-                            <Star className="h-4 w-4 fill-current text-amber-500" />
-                          </div>
-                        </td>
+                        {/* Bỏ cột Lượt làm */}
+                        {/* Bỏ cột Đánh giá */}
                         <td className="px-6 py-4">
                           {exam.avgScore > 0 ? (
                             <span
@@ -1178,8 +1500,10 @@ const ManageExams = () => {
                           )}
                         </td>
                         <td className="px-6 py-4 text-gray-800">
-                          {exam.price > 0 ? (
-                            `${exam.price.toLocaleString()} VNĐ`
+                          {exam.accessLevel === "premium" ? (
+                            <span className="inline-flex rounded-full bg-purple-100 px-2 py-1 text-xs font-medium text-purple-800">
+                              Premium
+                            </span>
                           ) : (
                             <span className="inline-flex rounded-full bg-green-100 px-2 py-1 text-xs font-medium text-green-800">
                               Miễn phí
@@ -1209,7 +1533,7 @@ const ManageExams = () => {
                   ) : (
                     <tr>
                       <td
-                        colSpan={10}
+                        colSpan={8}
                         className="px-6 py-8 text-center text-gray-500"
                       >
                         Không tìm thấy đề thi nào phù hợp với tìm kiếm
@@ -1221,10 +1545,142 @@ const ManageExams = () => {
             </div>
           </div>
 
+          {totalPages > 1 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
+              <button
+                className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(1)}
+                title="Trang đầu"
+              >
+                <span className="sr-only">Trang đầu</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="lucide lucide-chevrons-left"
+                >
+                  <path d="m11 17-5-5 5-5" />
+                  <path d="m18 17-5-5 5-5" />
+                </svg>
+              </button>
+              <button
+                className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                title="Trang trước"
+              >
+                <span className="sr-only">Trang trước</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="lucide lucide-chevron-left"
+                >
+                  <path d="m15 18-6-6 6-6" />
+                </svg>
+              </button>
+
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                // Tính toán số trang hiển thị để đảm bảo trang hiện tại luôn ở giữa khi có thể
+                let pageNum = i + 1;
+                if (totalPages > 5) {
+                  if (currentPage > 3) {
+                    if (currentPage + 2 <= totalPages) {
+                      pageNum = currentPage - 2 + i;
+                    } else {
+                      pageNum = totalPages - 4 + i;
+                    }
+                  }
+                }
+
+                return (
+                  <button
+                    key={`page-${pageNum}`}
+                    className={`rounded-md border px-3 py-1.5 text-sm font-medium transition-all ${
+                      currentPage === pageNum
+                        ? "border-blue-500 bg-blue-500 text-white hover:bg-blue-600"
+                        : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              <button
+                className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={currentPage === totalPages}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                title="Trang sau"
+              >
+                <span className="sr-only">Trang sau</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="lucide lucide-chevron-right"
+                >
+                  <path d="m9 18 6-6-6-6" />
+                </svg>
+              </button>
+              <button
+                className="flex items-center rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-600 transition-all hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                title="Trang cuối"
+              >
+                <span className="sr-only">Trang cuối</span>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="lucide lucide-chevrons-right"
+                >
+                  <path d="m13 17 5-5-5-5" />
+                  <path d="m6 17 5-5-5-5" />
+                </svg>
+              </button>
+
+              <div className="ml-2 flex items-center text-sm text-gray-500">
+                <span>
+                  Trang {currentPage} / {totalPages}
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* Biểu đồ */}
           <div
             ref={chartsRef}
-            className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2 opacity-0"
+            className="mb-8 grid grid-cols-1 gap-8 lg:grid-cols-2 "
           >
             {/* Biểu đồ lượt làm bài - Thay thế bằng Area Chart từ admin-home */}
             <div
@@ -1401,34 +1857,22 @@ const ManageExams = () => {
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium text-gray-700">
-                    Tên Đề thi
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
-                    placeholder="Nhập tên đề thi"
-                    required
-                  />
-                </div>
+                {/* Xóa phần select trùng lặp, chỉ giữ lại một */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700">
                     Chủ đề
                   </label>
                   <select
-                    name="topic"
-                    value={formData.topic}
-                    onChange={handleInputChange}
+                    name="topicId"
+                    value={formData.topicId || ""}
+                    onChange={handleTopicChange} // Thay đổi từ handleInputChange sang handleTopicChange
                     className="w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
                     required
                   >
-                    {itTopics.map((topic) => (
-                      <option key={topic} value={topic}>
-                        {topic || "Chọn chủ đề"}
+                    <option value="">Chọn chủ đề</option>
+                    {topics.map((topic) => (
+                      <option key={topic._id} value={topic._id}>
+                        {topic.name}
                       </option>
                     ))}
                   </select>
@@ -1503,15 +1947,23 @@ const ManageExams = () => {
                   <label className="block text-sm font-medium text-gray-700">
                     Nội dung đề thi
                   </label>
+                  <textarea
+                    name="examContent"
+                    value={formData.examContent}
+                    onChange={handleInputChange}
+                    className="mt-1 w-full rounded-lg border border-gray-300 px-4 py-3 transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+                    placeholder="Nhập mô tả hoặc nội dung đề thi"
+                    rows={3}
+                  ></textarea>
 
-                  {formData.topic ? (
+                  {formData.topicId ? (
                     <div className="mt-4 space-y-4">
                       <div className="flex items-center justify-between">
                         <h3 className="text-md font-medium text-gray-800">
                           Chọn câu hỏi cho đề thi{" "}
                           {formData.questions && (
                             <span className="text-sm font-normal text-gray-500">
-                              (Đã chọn {selectedQuestions.length}/
+                              (Đã chọn {formData.selectedQuestions.length}/
                               {formData.questions})
                             </span>
                           )}
@@ -1548,119 +2000,106 @@ const ManageExams = () => {
                         </div>
                       </div>
 
-                      {/* Hiển thị thông tin về số lượng câu hỏi */}
-                      {formData.questions && (
-                        <div className="flex items-center rounded-lg bg-blue-50 p-3 text-blue-700">
-                          <Info className="mr-2 h-5 w-5" />
-                          <p className="text-sm">
-                            Vui lòng chọn <strong>{formData.questions}</strong>{" "}
-                            câu hỏi cho đề thi này. Nhấp vào mỗi câu hỏi để
-                            chọn.
-                          </p>
-                        </div>
-                      )}
-
                       {/* Danh sách câu hỏi */}
                       <div className="max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 bg-gray-50 p-4">
-                        {filteredQuestions.length > 0 ? (
+                        {isLoading && loadingAction === "fetch-questions" ? (
+                          <div className="flex h-32 items-center justify-center">
+                            <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                            <p className="ml-3 text-gray-600">
+                              Đang tải câu hỏi...
+                            </p>
+                          </div>
+                        ) : filteredTopicQuestions &&
+                          filteredTopicQuestions.length > 0 ? (
                           <div className="space-y-3">
-                            {filteredQuestions.map((question) => {
-                              const isSelected = selectedQuestions.some(
-                                (q) => q.id === question.id
-                              );
-                              return (
-                                <div
-                                  key={question.id}
-                                  onClick={() => handleQuestionSelect(question)}
-                                  className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
-                                    isSelected
-                                      ? "border-blue-500 bg-blue-50 shadow-md"
-                                      : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50"
-                                  }`}
-                                >
-                                  <div className="flex items-start">
-                                    <div className="mr-3 mt-0.5">
-                                      <div
-                                        className={`flex h-6 w-6 items-center justify-center rounded-full border ${
-                                          isSelected
-                                            ? "border-blue-500 bg-blue-500 text-white"
-                                            : "border-gray-300 bg-white"
-                                        }`}
-                                      >
-                                        {isSelected && (
-                                          <Check className="h-4 w-4" />
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="flex items-center justify-between">
-                                        <h4 className="font-medium text-gray-800">
-                                          {question.content}
-                                        </h4>
-                                        <span
-                                          className={`ml-2 rounded-full px-2 py-1 text-xs font-medium ${
-                                            question.difficulty === "Dễ"
-                                              ? "bg-green-100 text-green-800"
-                                              : question.difficulty ===
-                                                "Trung bình"
-                                              ? "bg-blue-100 text-blue-800"
-                                              : "bg-orange-100 text-orange-800"
-                                          }`}
-                                        >
-                                          {question.difficulty}
-                                        </span>
-                                      </div>
-                                      <p className="mt-1 text-sm text-gray-500">
-                                        ID: {question.id}
-                                      </p>
+                            {filteredTopicQuestions.map((question) => (
+                              <div
+                                key={question.id}
+                                onClick={() =>
+                                  handleQuestionSelection(question.id)
+                                }
+                                className={`cursor-pointer rounded-lg border p-4 transition-all duration-200 ${
+                                  question.isSelected
+                                    ? "border-blue-500 bg-blue-50 shadow-md"
+                                    : "border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50/50"
+                                }`}
+                              >
+                                <div className="flex items-start">
+                                  <div className="mr-3 mt-0.5">
+                                    <div
+                                      className={`flex h-6 w-6 items-center justify-center rounded-full border ${
+                                        question.isSelected
+                                          ? "border-blue-500 bg-blue-500 text-white"
+                                          : "border-gray-300 bg-white"
+                                      }`}
+                                    >
+                                      {question.isSelected && (
+                                        <Check className="h-4 w-4" />
+                                      )}
                                     </div>
                                   </div>
+                                  <div className="flex-1">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="font-medium text-gray-800">
+                                        {question.content}
+                                      </h4>
+                                      <span
+                                        className={`ml-2 rounded-full px-2 py-1 text-xs font-medium ${
+                                          question.difficulty === "easy"
+                                            ? "bg-green-100 text-green-800"
+                                            : question.difficulty === "medium"
+                                            ? "bg-blue-100 text-blue-800"
+                                            : question.difficulty === "hard"
+                                            ? "bg-orange-100 text-orange-800"
+                                            : "bg-red-100 text-red-800"
+                                        }`}
+                                      >
+                                        {question.difficulty}
+                                      </span>
+                                    </div>
+                                    {question.isSelected && (
+                                      <div className="mt-2 flex items-center">
+                                        <label className="mr-2 text-sm text-gray-600">
+                                          Điểm:
+                                        </label>
+                                        <select
+                                          value={question.points || 1}
+                                          onChange={(e) =>
+                                            handleQuestionPointsChange(
+                                              question.id,
+                                              parseInt(e.target.value)
+                                            )
+                                          }
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="rounded border border-gray-300 px-2 py-1 text-sm"
+                                        >
+                                          <option value="1">1</option>
+                                          <option value="2">2</option>
+                                          <option value="3">3</option>
+                                          <option value="4">4</option>
+                                          <option value="5">5</option>
+                                        </select>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
-                              );
-                            })}
+                              </div>
+                            ))}
                           </div>
                         ) : (
                           <div className="flex h-32 items-center justify-center">
                             <p className="text-gray-500">
-                              Không tìm thấy câu hỏi nào phù hợp
+                              {formData.allTopicQuestions &&
+                              formData.allTopicQuestions.length === 0
+                                ? "Không tìm thấy câu hỏi nào cho chủ đề này"
+                                : "Không tìm thấy câu hỏi nào phù hợp với tìm kiếm"}
                             </p>
                           </div>
                         )}
                       </div>
-
-                      {/* Hiển thị câu hỏi đã chọn */}
-                      {selectedQuestions.length > 0 && (
-                        <div className="rounded-lg border border-gray-200 bg-white p-4">
-                          <h4 className="mb-3 font-medium text-gray-800">
-                            Câu hỏi đã chọn ({selectedQuestions.length})
-                          </h4>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedQuestions.map((question) => (
-                              <div
-                                key={question.id}
-                                className="flex items-center rounded-lg bg-blue-100 px-3 py-1.5 text-sm text-blue-800"
-                              >
-                                <span className="mr-1.5">
-                                  ID: {question.id}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleQuestionSelect(question);
-                                  }}
-                                  className="ml-1 rounded-full p-0.5 text-blue-600 hover:bg-blue-200 hover:text-blue-800"
-                                >
-                                  <X className="h-3 w-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ) : (
-                    <div className="flex h-40 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
+                    <div className="mt-4 flex h-32 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50">
                       <div className="text-center">
                         <FileText className="mx-auto h-10 w-10 text-gray-400" />
                         <p className="mt-2 text-sm text-gray-500">
@@ -1703,6 +2142,63 @@ const ManageExams = () => {
                   )}
                 </div>
               </div>
+              {isLoading && loadingAction === "update" && (
+                <div className="mt-4 rounded-md bg-blue-50 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700">
+                        Đang lưu đề thi, vui lòng đợi...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Hiển thị khi đang tải câu hỏi */}
+              {isLoading && loadingAction === "fetch-questions" && (
+                <div className="mt-4 rounded-md bg-blue-50 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-blue-700">
+                        Đang tải danh sách câu hỏi theo chủ đề...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Hiển thị nếu chọn sai số lượng câu hỏi */}
+              {formData.questions &&
+                parseInt(formData.questions) !==
+                  formData.selectedQuestions.length && (
+                  <div className="mt-4 rounded-md bg-yellow-50 p-4">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <AlertTriangle className="h-5 w-5 text-yellow-400" />
+                      </div>
+                      <div className="ml-3">
+                        <p className="text-sm text-yellow-700">
+                          {formData.selectedQuestions.length >
+                          parseInt(formData.questions)
+                            ? `Bạn đã chọn nhiều hơn ${
+                                formData.selectedQuestions.length -
+                                parseInt(formData.questions)
+                              } câu hỏi so với yêu cầu.`
+                            : `Bạn cần chọn thêm ${
+                                parseInt(formData.questions) -
+                                formData.selectedQuestions.length
+                              } câu hỏi.`}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               <div className="sticky bottom-0 z-10 flex justify-end gap-4 bg-white pb-2 pt-4">
                 <button
                   type="button"
@@ -1793,37 +2289,42 @@ const ManageExams = () => {
       )}
 
       {/* Global CSS for animations */}
-      <style jsx global>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+      {/* Global CSS for animations */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
-        .animate-fade-in {
-          animation: fadeIn 0.3s ease-out forwards;
-        }
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
 
-        .animate-fade-in-up {
-          animation: fadeInUp 0.5s ease-out forwards;
-        }
-      `}</style>
+    .animate-fade-in-up {
+      animation: fadeInUp 0.5s ease-out forwards;
+    }
+  `,
+        }}
+      />
     </div>
   );
 };

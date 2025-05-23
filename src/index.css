@@ -1,5 +1,11 @@
-@import "tailwindcss";
+/* Xóa dòng này */
+/* @import "tailwindcss"; */
 
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Phần còn lại giữ nguyên */
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -11,12 +17,4 @@
   }
 }
 
-@keyframes growWidth {
-  from {
-    width: 0;
-  }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.3s ease-out forwards;
-}
+/* ... */
